@@ -7,6 +7,7 @@ import Estimate from "./pages/Estimate";
 import Recyclers from "./pages/Recyclers";
 import Pickup from "./pages/Pickup";
 import Dashboard from "./pages/Dashboard";
+import AdminDashboard from "./pages/AdminDashboard";
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
             <Route path="/recyclers" element={<Recyclers />} />
             <Route path="/pickup" element={<Pickup />} />
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/admin" element={<AdminDashboard />} />
           </Routes>
         </main>
 
