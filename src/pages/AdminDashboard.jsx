@@ -1,7 +1,15 @@
 import { Link } from "react-router-dom";
 
 export default function AdminDashboard() {
-  const requests = [
+  const storedBooking = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("pickupBooking"));
+    } catch {
+      return null;
+    }
+  })();
+
+  const staticRequests = [
     {
       id: 1,
       user: "Rahul Sharma",
@@ -34,28 +42,67 @@ export default function AdminDashboard() {
     },
   ];
 
+  const dynamicRequest = storedBooking
+    ? [
+        {
+          id: storedBooking.bookingId || 999,
+          user: storedBooking.customerName || "New User",
+          device: `${storedBooking.brand || ""} ${storedBooking.model || ""}`.trim() || "Uploaded Device",
+          type: storedBooking.deviceType || "Unknown",
+          status: storedBooking.bookingStatus || "Pickup Confirmed",
+          pickupDate: storedBooking.pickupDate || "Not scheduled",
+          offer: `₹${storedBooking.finalOffer || 0}`,
+          recycler: storedBooking.recyclerName || "Assigned Recycler",
+          address: storedBooking.customerAddress || "No address available",
+          contact: storedBooking.customerContact || "No contact available",
+          notes: storedBooking.notes || "No extra instructions",
+          isLive: true,
+        },
+      ]
+    : [];
+
+  const requests = [...dynamicRequest, ...staticRequests];
+
+  const totalRevenue = requests.reduce((acc, request) => {
+    const amount = Number(String(request.offer).replace(/[^\d]/g, ""));
+    return acc + (Number.isNaN(amount) ? 0 : amount);
+  }, 0);
+
+  const pendingCount = requests.filter(
+    (request) =>
+      request.status === "Pending" || request.status === "Pickup Confirmed"
+  ).length;
+
+  const assignedCount = requests.filter(
+    (request) => request.status === "Assigned"
+  ).length;
+
+  const completedCount = requests.filter(
+    (request) => request.status === "Completed"
+  ).length;
+
   const stats = [
     {
       title: "Total Requests",
-      value: 18,
+      value: requests.length,
       bg: "bg-green-100",
       text: "text-green-700",
     },
     {
       title: "Pending Pickups",
-      value: 6,
+      value: pendingCount,
       bg: "bg-yellow-100",
       text: "text-yellow-700",
     },
     {
       title: "Completed Pickups",
-      value: 9,
+      value: completedCount,
       bg: "bg-blue-100",
       text: "text-blue-700",
     },
     {
       title: "Revenue Processed",
-      value: "₹52,400",
+      value: `₹${totalRevenue.toLocaleString("en-IN")}`,
       bg: "bg-purple-100",
       text: "text-purple-700",
     },
@@ -71,8 +118,30 @@ export default function AdminDashboard() {
     if (status === "Completed") {
       return "bg-green-100 text-green-700";
     }
+    if (status === "Pickup Confirmed") {
+      return "bg-purple-100 text-purple-700";
+    }
     return "bg-gray-100 text-gray-700";
   };
+
+  const topRecyclerMap = requests.reduce((acc, request) => {
+    acc[request.recycler] = (acc[request.recycler] || 0) + 1;
+    return acc;
+  }, {});
+
+  const topRecycler =
+    Object.entries(topRecyclerMap).sort((a, b) => b[1] - a[1])[0]?.[0] ||
+    "GreenCycle Recyclers";
+
+  const averageOffer =
+    requests.length > 0
+      ? Math.round(totalRevenue / requests.length).toLocaleString("en-IN")
+      : "0";
+
+  const completionRate =
+    requests.length > 0
+      ? Math.round((completedCount / requests.length) * 100)
+      : 0;
 
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6">
@@ -106,6 +175,32 @@ export default function AdminDashboard() {
           ))}
         </div>
 
+        {storedBooking && (
+          <div className="bg-green-50 border border-green-200 rounded-3xl p-5 sm:p-6 mb-8 shadow-sm">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+              <div>
+                <p className="text-green-700 font-semibold mb-1">
+                  Live User Request Added
+                </p>
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
+                  {storedBooking.customerName} scheduled a pickup
+                </h2>
+                <p className="text-sm text-gray-600 mt-2">
+                  Recycler: {storedBooking.recyclerName} • Offer: ₹
+                  {storedBooking.finalOffer} • Date: {storedBooking.pickupDate}
+                </p>
+              </div>
+
+              <div className="bg-white border border-green-200 rounded-2xl px-4 py-3">
+                <p className="text-sm text-gray-500">Booking ID</p>
+                <p className="font-bold text-green-700">
+                  {storedBooking.bookingId}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
           <div className="xl:col-span-2 bg-white shadow-md rounded-3xl p-5 sm:p-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
@@ -121,29 +216,65 @@ export default function AdminDashboard() {
               {requests.map((request) => (
                 <div
                   key={request.id}
-                  className="border rounded-2xl p-4 sm:p-5 bg-gray-50"
+                  className={`border rounded-2xl p-4 sm:p-5 ${
+                    request.isLive
+                      ? "bg-green-50 border-green-200"
+                      : "bg-gray-50 border-gray-200"
+                  }`}
                 >
                   <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
                     <div className="space-y-2">
-                      <h3 className="text-lg font-bold text-gray-800">
-                        {request.device}
-                      </h3>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="text-lg font-bold text-gray-800">
+                          {request.device}
+                        </h3>
+                        {request.isLive && (
+                          <span className="px-3 py-1 rounded-full text-xs font-semibold bg-green-600 text-white">
+                            LIVE
+                          </span>
+                        )}
+                      </div>
+
                       <p className="text-sm text-gray-600">
                         <span className="font-semibold">User:</span>{" "}
                         {request.user}
                       </p>
+
                       <p className="text-sm text-gray-600">
                         <span className="font-semibold">Type:</span>{" "}
                         {request.type}
                       </p>
+
                       <p className="text-sm text-gray-600">
                         <span className="font-semibold">Pickup Date:</span>{" "}
                         {request.pickupDate}
                       </p>
+
                       <p className="text-sm text-gray-600">
                         <span className="font-semibold">Recycler:</span>{" "}
                         {request.recycler}
                       </p>
+
+                      {request.address && (
+                        <p className="text-sm text-gray-600">
+                          <span className="font-semibold">Address:</span>{" "}
+                          {request.address}
+                        </p>
+                      )}
+
+                      {request.contact && (
+                        <p className="text-sm text-gray-600">
+                          <span className="font-semibold">Contact:</span>{" "}
+                          {request.contact}
+                        </p>
+                      )}
+
+                      {request.notes && request.isLive && (
+                        <p className="text-sm text-gray-600">
+                          <span className="font-semibold">Notes:</span>{" "}
+                          {request.notes}
+                        </p>
+                      )}
                     </div>
 
                     <div className="flex flex-col sm:flex-row lg:flex-col gap-3 lg:items-end">
@@ -185,13 +316,13 @@ export default function AdminDashboard() {
 
               <div className="space-y-3 text-gray-700">
                 <div className="p-3 rounded-xl bg-yellow-50 border border-yellow-100">
-                  📦 6 pickup requests waiting
+                  📦 {pendingCount} pickup requests waiting
                 </div>
                 <div className="p-3 rounded-xl bg-blue-50 border border-blue-100">
-                  🚚 3 devices assigned for pickup
+                  🚚 {assignedCount} devices assigned for pickup
                 </div>
                 <div className="p-3 rounded-xl bg-green-50 border border-green-100">
-                  ✅ 9 devices processed successfully
+                  ✅ {completedCount} devices processed successfully
                 </div>
               </div>
             </div>
@@ -204,19 +335,19 @@ export default function AdminDashboard() {
               <div className="space-y-4 text-gray-700">
                 <div className="p-4 rounded-2xl bg-gray-50 border">
                   <p className="text-sm text-gray-500">Top Recycler</p>
-                  <p className="font-semibold text-gray-800">
-                    GreenCycle Recyclers
-                  </p>
+                  <p className="font-semibold text-gray-800">{topRecycler}</p>
                 </div>
 
                 <div className="p-4 rounded-2xl bg-gray-50 border">
                   <p className="text-sm text-gray-500">Avg. Offer Value</p>
-                  <p className="font-semibold text-gray-800">₹12,800</p>
+                  <p className="font-semibold text-gray-800">₹{averageOffer}</p>
                 </div>
 
                 <div className="p-4 rounded-2xl bg-gray-50 border">
                   <p className="text-sm text-gray-500">Completion Rate</p>
-                  <p className="font-semibold text-gray-800">87%</p>
+                  <p className="font-semibold text-gray-800">
+                    {completionRate}%
+                  </p>
                 </div>
               </div>
             </div>

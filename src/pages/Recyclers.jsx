@@ -1,9 +1,48 @@
+import { useMemo } from "react";
 import { useLocation, Link } from "react-router-dom";
 import { recyclers } from "../data/recyclers";
 
 export default function Recyclers() {
   const location = useLocation();
-  const data = location.state;
+
+  const storedData = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("deviceEstimate"));
+    } catch {
+      return null;
+    }
+  })();
+
+  const data = location.state || storedData;
+
+  const finalRecyclers = useMemo(() => {
+    if (!data) return [];
+
+    const estimatedValue = Number(data.estimatedValue || 0);
+
+    return recyclers
+      .map((recycler) => {
+        const distanceNumber = Number.parseFloat(
+          String(recycler.distance).replace(/[^\d.]/g, "")
+        );
+
+        const safeDistance = Number.isNaN(distanceNumber) ? 50 : distanceNumber;
+        const ratingScore = Number(recycler.rating || 0) * 10;
+        const pickupScore = recycler.pickup ? 30 : 0;
+        const distanceScore = Math.max(0, 200 - safeDistance);
+        const offerBonusScore = Number(recycler.offerBonus || 0) / 10;
+
+        const score =
+          pickupScore + ratingScore + distanceScore + offerBonusScore;
+
+        return {
+          ...recycler,
+          finalOffer: estimatedValue + Number(recycler.offerBonus || 0),
+          score,
+        };
+      })
+      .sort((a, b) => b.score - a.score);
+  }, [data]);
 
   if (!data) {
     return (
@@ -26,17 +65,21 @@ export default function Recyclers() {
     );
   }
 
-  const finalRecyclers = recyclers
-    .map((recycler) => ({
-      ...recycler,
-      finalOffer: data.estimatedValue + recycler.offerBonus,
-      score:
-        (recycler.pickup ? 30 : 0) +
-        recycler.rating * 10 +
-        (200 - Number.parseFloat(recycler.distance)) +
-        recycler.offerBonus / 10,
-    }))
-    .sort((a, b) => b.score - a.score);
+  const handleSelectRecycler = (recycler) => {
+    const selectedRecyclerData = {
+      ...data,
+      recyclerName: recycler.name,
+      finalOffer: recycler.finalOffer,
+      pickup: recycler.pickup,
+      recyclerLocation: recycler.location,
+      recyclerRating: recycler.rating,
+    };
+
+    localStorage.setItem(
+      "selectedRecyclerData",
+      JSON.stringify(selectedRecyclerData)
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 py-10 px-4">
@@ -57,28 +100,28 @@ export default function Recyclers() {
             <div className="p-4 rounded-2xl bg-gray-50 border">
               <p className="text-sm text-gray-500">Device</p>
               <h2 className="text-lg font-semibold text-gray-800">
-                {data.deviceType}
+                {data.deviceType || "Unknown Device"}
               </h2>
             </div>
 
             <div className="p-4 rounded-2xl bg-gray-50 border">
               <p className="text-sm text-gray-500">Base Value</p>
               <h2 className="text-lg font-semibold text-green-600">
-                ₹{data.estimatedValue}
+                ₹{Number(data.estimatedValue || 0)}
               </h2>
             </div>
 
             <div className="p-4 rounded-2xl bg-gray-50 border">
               <p className="text-sm text-gray-500">Suggested Path</p>
               <h2 className="text-lg font-semibold text-gray-800">
-                {data.suggestion}
+                {data.suggestion || "Recycle Responsibly"}
               </h2>
             </div>
 
             <div className="p-4 rounded-2xl bg-gray-50 border">
               <p className="text-sm text-gray-500">Sustainability Score</p>
               <h2 className="text-lg font-semibold text-gray-800">
-                {data.sustainabilityScore}%
+                {data.sustainabilityScore || 85}%
               </h2>
             </div>
           </div>
@@ -145,7 +188,12 @@ export default function Recyclers() {
                 </h3>
                 <ul className="text-sm text-gray-700 space-y-1">
                   <li>• Strong rating and trusted recycling partner</li>
-                  <li>• {recycler.pickup ? "Pickup available for convenience" : "Manual drop-off required"}</li>
+                  <li>
+                    •{" "}
+                    {recycler.pickup
+                      ? "Pickup available for convenience"
+                      : "Manual drop-off required"}
+                  </li>
                   <li>• Better value alignment with your device estimate</li>
                 </ul>
               </div>
@@ -160,6 +208,7 @@ export default function Recyclers() {
                   recyclerLocation: recycler.location,
                   recyclerRating: recycler.rating,
                 }}
+                onClick={() => handleSelectRecycler(recycler)}
                 className="block text-center bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-xl transition"
               >
                 Select Recycler

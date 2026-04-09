@@ -1,17 +1,35 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useLocation, Link, useNavigate } from "react-router-dom";
 import Loader from "../components/Loader";
 
 export default function Pickup() {
   const location = useLocation();
   const navigate = useNavigate();
-  const data = location.state;
+
+  const storedRecyclerData = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("selectedRecyclerData"));
+    } catch {
+      return null;
+    }
+  })();
+
+  const data = location.state || storedRecyclerData;
+
+  const today = useMemo(() => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }, []);
 
   const [formData, setFormData] = useState({
     name: "",
     address: "",
     contact: "",
     pickupDate: "",
+    notes: "",
   });
 
   const [loading, setLoading] = useState(false);
@@ -42,19 +60,41 @@ export default function Pickup() {
   }
 
   const handleChange = (e) => {
+    const { name, value } = e.target;
+
     setFormData((prev) => ({
       ...prev,
-      [e.target.name]: e.target.value,
+      [name]: value,
     }));
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
+
+    if (!data.pickup) {
+      alert("This recycler does not support pickup. Please choose another recycler or arrange drop-off.");
+      return;
+    }
+
+    const bookingData = {
+      ...data,
+      customerName: formData.name,
+      customerAddress: formData.address,
+      customerContact: formData.contact,
+      pickupDate: formData.pickupDate,
+      notes: formData.notes,
+      bookingStatus: "Pickup Confirmed",
+      bookingId: `REV-${Date.now()}`,
+      bookedAt: new Date().toISOString(),
+    };
+
+    localStorage.setItem("pickupBooking", JSON.stringify(bookingData));
+
     setLoading(true);
 
     setTimeout(() => {
-      navigate("/dashboard");
-    }, 1500);
+      navigate("/dashboard", { state: bookingData });
+    }, 1800);
   };
 
   return (
@@ -82,7 +122,33 @@ export default function Pickup() {
               {data.pickup ? "Available" : "Drop Required"}
             </p>
           </div>
+
+          <div className="p-4 bg-gray-50 border rounded-xl">
+            <p className="text-sm text-gray-500">Recycler Location</p>
+            <p className="text-lg font-semibold text-gray-800">
+              {data.recyclerLocation || "Not available"}
+            </p>
+          </div>
+
+          <div className="p-4 bg-gray-50 border rounded-xl">
+            <p className="text-sm text-gray-500">Recycler Rating</p>
+            <p className="text-lg font-semibold text-gray-800">
+              ⭐ {data.recyclerRating || "N/A"}
+            </p>
+          </div>
         </div>
+
+        {!data.pickup && (
+          <div className="mb-6 p-4 rounded-2xl bg-yellow-50 border border-yellow-200">
+            <h3 className="font-semibold text-yellow-800 mb-1">
+              Pickup not available
+            </h3>
+            <p className="text-sm text-yellow-700">
+              This recycler requires manual drop-off. Go back and choose another
+              recycler if you want home pickup.
+            </p>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="grid gap-6">
           <input
@@ -120,16 +186,36 @@ export default function Pickup() {
             name="pickupDate"
             value={formData.pickupDate}
             onChange={handleChange}
+            min={today}
             className="border rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-green-500"
             required
           />
 
-          <button
-            type="submit"
-            className="bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-semibold transition transform hover:scale-105 active:scale-95"
-          >
-            Confirm Pickup
-          </button>
+          <textarea
+            name="notes"
+            placeholder="Extra instructions (optional) - e.g. call before arrival, 2nd floor, gate code, fragile screen"
+            value={formData.notes}
+            onChange={handleChange}
+            className="border rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-green-500"
+            rows="3"
+          />
+
+          <div className="flex flex-col sm:flex-row gap-4">
+            <button
+              type="submit"
+              disabled={!data.pickup}
+              className="bg-green-600 hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white py-3 px-6 rounded-xl font-semibold transition transform hover:scale-105 active:scale-95"
+            >
+              Confirm Pickup
+            </button>
+
+            <Link
+              to="/recyclers"
+              className="text-center border border-gray-300 hover:bg-gray-100 text-gray-700 py-3 px-6 rounded-xl font-semibold transition"
+            >
+              Back to Recyclers
+            </Link>
+          </div>
         </form>
       </div>
     </div>
