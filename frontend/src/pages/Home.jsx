@@ -14,6 +14,13 @@ import img1 from "../assets/image-1.jpeg";
 import img2 from "../assets/image-2.jpeg";
 import img3 from "../assets/image-3.jpeg";
 
+import category1 from "../assets/Mobiles.png";
+import category2 from "../assets/Laptop.png";
+import category3 from "../assets/Accessories.png";
+import category4 from "../assets/homeelctronics.png";
+import category5 from "../assets/Office-E-Waste.png";
+import category6 from "../assets/Hardisk.png";
+
 import HeroSection from "../components/home/HeroSection";
 import CategoriesSection from "../components/home/CategoriesSection";
 import FeaturesSection from "../components/home/FeaturesSection";
@@ -86,12 +93,12 @@ export default function Home() {
   ];
 
   const categories = [
-    "Mobiles & Tablets",
-    "Laptops & PCs",
-    "Accessories",
-    "Home Electronics",
-    "Broken Devices",
-    "Office E-Waste",
+    { name: "Mobiles & Tablets", image: category1 },
+    { name: "Laptops & PCs", image: category2 },
+    { name: "Accessories", image: category3 },
+    { name: "Home Electronics", image: category4 },
+    { name: "Broken Devices", image: category5 },
+    { name: "Office E-Waste", image: category6 },
   ];
 
   const supportedDevices = [Smartphone, Laptop, Cpu];
@@ -122,7 +129,7 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-white text-slate-900 overflow-x-hidden">
+    <div className="min-h-screen overflow-x-hidden bg-white text-slate-900">
       <HeroSection
         impactStats={impactStats}
         sliderImages={sliderImages}
@@ -137,7 +144,6 @@ export default function Home() {
 
       <CategoriesSection categories={categories} />
       <FeaturesSection features={features} />
-
       <CTASection />
     </div>
   );

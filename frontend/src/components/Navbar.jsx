@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { onAuthStateChanged, signOut } from "firebase/auth";
+import { Menu, X, Cpu, UserCircle2, LogOut, LayoutDashboard, PlusCircle } from "lucide-react";
 import { auth } from "../firebase";
 
 export default function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
+
   const [currentUser, setCurrentUser] = useState(null);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -19,6 +22,7 @@ export default function Navbar() {
   const handleLogout = async () => {
     try {
       await signOut(auth);
+      setMobileOpen(false);
       navigate("/login");
     } catch (error) {
       console.error("Logout error:", error);
@@ -27,76 +31,193 @@ export default function Navbar() {
 
   const isActive = (path) => location.pathname === path;
 
-  const navLink = (path) =>
-    `text-sm font-medium transition ${
+  const navLinkClass = (path) =>
+    `relative text-sm font-medium transition duration-200 ${
       isActive(path)
-        ? "text-blue-600"
-        : "text-slate-700 hover:text-blue-600"
+        ? "text-emerald-600"
+        : "text-slate-700 hover:text-emerald-600"
     }`;
 
-  return (
-    <nav className="sticky top-0 z-50 w-full border-b bg-white shadow-sm">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4">
+  const navItemUnderline = (path) =>
+    isActive(path)
+      ? "after:absolute after:left-0 after:-bottom-2 after:h-0.5 after:w-full after:rounded-full after:bg-emerald-600"
+      : "";
 
-        {/* LOGO */}
-        <Link to="/" className="flex items-center gap-2">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white font-bold">
-            E
+  const closeMobileMenu = () => setMobileOpen(false);
+
+  return (
+    <nav className="sticky top-0 z-50 w-full border-b border-slate-200/80 bg-white/90 backdrop-blur-md shadow-sm">
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 md:px-6">
+        <Link
+          to="/"
+          onClick={closeMobileMenu}
+          className="flex items-center gap-3"
+        >
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-md">
+            <Cpu size={22} />
           </div>
-          <div>
-            <p className="text-lg font-bold text-slate-900">
+
+          <div className="leading-tight">
+            <p className="text-lg font-bold tracking-tight text-slate-900">
               ElectroParts
             </p>
-            <p className="text-xs text-slate-500 -mt-1">
-              Mobile & Electronics Parts
+            <p className="text-xs text-slate-500">
+              Smart E-Waste & Electronics
             </p>
           </div>
         </Link>
 
-        {/* LINKS */}
-        <div className="flex items-center gap-5">
-
-          <Link to="/" className={navLink("/")}>
+        <div className="hidden items-center gap-6 md:flex">
+          <Link to="/" className={`${navLinkClass("/")} ${navItemUnderline("/")}`}>
             Home
           </Link>
 
-          <Link to="/categories" className={navLink("/categories")}>
+          <Link
+            to="/categories"
+            className={`${navLinkClass("/categories")} ${navItemUnderline("/categories")}`}
+          >
             Categories
           </Link>
 
           {currentUser ? (
             <>
-              <Link to="/sell" className={navLink("/sell")}>
+              <Link
+                to="/sell"
+                className={`${navLinkClass("/sell")} ${navItemUnderline("/sell")} flex items-center gap-1`}
+              >
+                <PlusCircle size={16} />
                 Sell Parts
               </Link>
 
-              <Link to="/dashboard" className={navLink("/dashboard")}>
+              <Link
+                to="/dashboard"
+                className={`${navLinkClass("/dashboard")} ${navItemUnderline("/dashboard")} flex items-center gap-1`}
+              >
+                <LayoutDashboard size={16} />
                 Dashboard
               </Link>
 
-              <button
-                onClick={handleLogout}
-                className="rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-600"
-              >
-                Logout
-              </button>
+              <div className="flex items-center gap-3 pl-2">
+                <div className="hidden items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-2 lg:flex">
+                  <UserCircle2 size={18} className="text-emerald-600" />
+                  <span className="max-w-[160px] truncate text-sm text-slate-700">
+                    {currentUser.email}
+                  </span>
+                </div>
+
+                <button
+                  onClick={handleLogout}
+                  className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-100"
+                >
+                  <LogOut size={16} />
+                  Logout
+                </button>
+              </div>
             </>
           ) : (
-            <>
-              <Link to="/login" className={navLink("/login")}>
+            <div className="flex items-center gap-3">
+              <Link
+                to="/login"
+                className="rounded-xl px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 hover:text-emerald-600"
+              >
                 Login
               </Link>
 
               <Link
                 to="/register"
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
+                className="rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-2 text-sm font-semibold text-white shadow-md transition hover:scale-[1.02] hover:shadow-lg"
               >
-                Register
+                Get Started
               </Link>
-            </>
+            </div>
           )}
         </div>
+
+        <button
+          onClick={() => setMobileOpen((prev) => !prev)}
+          className="inline-flex items-center justify-center rounded-xl border border-slate-200 p-2 text-slate-700 transition hover:bg-slate-100 md:hidden"
+          aria-label="Toggle menu"
+        >
+          {mobileOpen ? <X size={22} /> : <Menu size={22} />}
+        </button>
       </div>
+
+      {mobileOpen && (
+        <div className="border-t border-slate-200 bg-white px-4 py-4 md:hidden">
+          <div className="flex flex-col gap-4">
+            <Link
+              to="/"
+              onClick={closeMobileMenu}
+              className={navLinkClass("/")}
+            >
+              Home
+            </Link>
+
+            <Link
+              to="/categories"
+              onClick={closeMobileMenu}
+              className={navLinkClass("/categories")}
+            >
+              Categories
+            </Link>
+
+            {currentUser ? (
+              <>
+                <Link
+                  to="/sell"
+                  onClick={closeMobileMenu}
+                  className={`${navLinkClass("/sell")} flex items-center gap-2`}
+                >
+                  <PlusCircle size={16} />
+                  Sell Parts
+                </Link>
+
+                <Link
+                  to="/dashboard"
+                  onClick={closeMobileMenu}
+                  className={`${navLinkClass("/dashboard")} flex items-center gap-2`}
+                >
+                  <LayoutDashboard size={16} />
+                  Dashboard
+                </Link>
+
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600">
+                  Signed in as
+                  <div className="mt-1 truncate font-medium text-slate-800">
+                    {currentUser.email}
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleLogout}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-600"
+                >
+                  <LogOut size={16} />
+                  Logout
+                </button>
+              </>
+            ) : (
+              <>
+                <Link
+                  to="/login"
+                  onClick={closeMobileMenu}
+                  className="rounded-xl border border-slate-200 px-4 py-2 text-center text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                >
+                  Login
+                </Link>
+
+                <Link
+                  to="/register"
+                  onClick={closeMobileMenu}
+                  className="rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-2 text-center text-sm font-semibold text-white shadow-sm transition hover:shadow-md"
+                >
+                  Get Started
+                </Link>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </nav>
   );
 }
