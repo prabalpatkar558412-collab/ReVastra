@@ -212,7 +212,7 @@ export default function AdminDashboard() {
 
         <div className="bg-white shadow-lg rounded-3xl p-6 sm:p-8 mb-8">
           <p className="text-green-600 font-semibold mb-2">
-            Recycler Operations Panel
+            Marketplace Operations Panel
           </p>
           <h1 className="text-3xl sm:text-4xl font-bold text-gray-800 mb-3">
             Admin Dashboard
@@ -372,6 +372,10 @@ export default function AdminDashboard() {
                                 <span className="font-semibold">Recycler:</span>{" "}
                                 {request.recyclerName}
                               </p>
+                              <p className="text-sm text-gray-600">
+                                <span className="font-semibold">Collector:</span>{" "}
+                                {request.assignedCollectorName || "Not assigned"}
+                              </p>
                             </div>
 
                             <div className="flex flex-col sm:flex-row lg:flex-col gap-3 lg:items-end">
@@ -413,6 +417,22 @@ export default function AdminDashboard() {
                               <p>
                                 <span className="font-semibold">Suggestion:</span>{" "}
                                 {request.submission?.suggestion || "Not available"}
+                              </p>
+                              <p>
+                                <span className="font-semibold">
+                                  Collector Stage:
+                                </span>{" "}
+                                {formatStatus(request.collectorStatus)}
+                              </p>
+                              <p>
+                                <span className="font-semibold">
+                                  Recycler Stage:
+                                </span>{" "}
+                                {formatStatus(request.recyclerStatus)}
+                              </p>
+                              <p>
+                                <span className="font-semibold">Payment:</span>{" "}
+                                {formatStatus(request.paymentStatus)}
                               </p>
                             </div>
                           ) : null}
@@ -551,17 +571,24 @@ export default function AdminDashboard() {
 
                   <div className="flex flex-col gap-3">
                     <Link
-                      to="/dashboard"
+                      to="/sell"
                       className="bg-green-600 hover:bg-green-700 text-white text-center px-4 py-3 rounded-xl font-medium transition"
                     >
-                      User Dashboard
+                      Add New Device
                     </Link>
 
                     <Link
-                      to="/sell"
+                      to="/login"
                       className="border border-gray-300 hover:bg-gray-100 text-gray-700 text-center px-4 py-3 rounded-xl font-medium transition"
                     >
-                      Add New Device
+                      Switch Account
+                    </Link>
+
+                    <Link
+                      to="/"
+                      className="border border-gray-300 hover:bg-gray-100 text-gray-700 text-center px-4 py-3 rounded-xl font-medium transition"
+                    >
+                      Back to Home
                     </Link>
 
                     <Link

@@ -1,15 +1,17 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Navbar from "./components/Navbar";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
 import Footer from "./components/Footer";
+import Navbar from "./components/Navbar";
 import ProtectedRoute from "./components/ProtectedRoute";
-import Home from "./pages/Home";
-import Sell from "./pages/Sell";
-import Estimate from "./pages/Estimate";
-import Recyclers from "./pages/Recyclers";
-import Pickup from "./pages/Pickup";
-import Dashboard from "./pages/Dashboard";
 import AdminDashboard from "./pages/AdminDashboard";
+import CollectorDashboard from "./pages/CollectorDashboard";
+import Dashboard from "./pages/Dashboard";
+import Estimate from "./pages/Estimate";
+import Home from "./pages/Home";
 import Login from "./pages/Login";
+import Pickup from "./pages/Pickup";
+import RecyclerDashboard from "./pages/RecyclerDashboard";
+import Recyclers from "./pages/Recyclers";
+import Sell from "./pages/Sell";
 
 function App() {
   return (
@@ -28,8 +30,24 @@ function App() {
             <Route
               path="/dashboard"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute role="user">
                   <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/collector"
+              element={
+                <ProtectedRoute role="collector">
+                  <CollectorDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/recycler"
+              element={
+                <ProtectedRoute role="recycler">
+                  <RecyclerDashboard />
                 </ProtectedRoute>
               }
             />

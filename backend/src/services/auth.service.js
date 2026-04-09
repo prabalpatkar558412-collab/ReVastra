@@ -1,6 +1,7 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { admin, db } = require("../config/firebase");
+const { recyclers } = require("../data/recyclers");
 
 const usersCollection = db.collection("users");
 
@@ -20,6 +21,20 @@ function sanitizeUser(user) {
     name: user.name,
     email: user.email,
     role: user.role,
+    organizationName: user.organizationName || "",
+    serviceArea: user.serviceArea || "",
+    managedRecyclerId: user.managedRecyclerId || "",
+    phone: user.phone || "",
+    address: user.address || "",
+    preferredPaymentMethod: user.preferredPaymentMethod || "UPI",
+    upiId: user.upiId || "",
+    bankAccount: user.bankAccount || "",
+    rewardPoints: user.rewardPoints || 0,
+    notificationPreferences: {
+      sms: user.notificationPreferences?.sms ?? true,
+      email: user.notificationPreferences?.email ?? true,
+      app: user.notificationPreferences?.app ?? true,
+    },
     createdAt: user.createdAt,
     totalEarnings: user.totalEarnings || 0,
     devicesRecycled: user.devicesRecycled || 0,
@@ -38,7 +53,20 @@ async function findUserByEmail(email) {
   return snapshot.docs[0].data();
 }
 
-async function createUser({ name, email, password, role = "user" }) {
+async function createUser({
+  name,
+  email,
+  password,
+  role = "user",
+  organizationName = "",
+  serviceArea = "",
+  managedRecyclerId = "",
+  phone = "",
+  address = "",
+  preferredPaymentMethod = "UPI",
+  upiId = "",
+  bankAccount = "",
+}) {
   const normalizedEmail = email.trim().toLowerCase();
   const existingUser = await findUserByEmail(normalizedEmail);
 
@@ -58,6 +86,20 @@ async function createUser({ name, email, password, role = "user" }) {
     email: normalizedEmail,
     passwordHash,
     role,
+    organizationName: organizationName.trim(),
+    serviceArea: serviceArea.trim(),
+    managedRecyclerId: managedRecyclerId.trim(),
+    phone: phone.trim(),
+    address: address.trim(),
+    preferredPaymentMethod: preferredPaymentMethod.trim() || "UPI",
+    upiId: upiId.trim(),
+    bankAccount: bankAccount.trim(),
+    rewardPoints: 0,
+    notificationPreferences: {
+      sms: true,
+      email: true,
+      app: true,
+    },
     createdAt: now,
     updatedAt: now,
     totalEarnings: 0,
@@ -127,6 +169,45 @@ async function getUserById(userId) {
   return sanitizeUser(doc.data());
 }
 
+async function updateUserProfile(userId, payload) {
+  const userRef = usersCollection.doc(userId);
+  const userDoc = await userRef.get();
+
+  if (!userDoc.exists) {
+    const error = new Error("User not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const now = new Date().toISOString();
+  const nextNotificationPreferences = {
+    sms: payload.notificationPreferences?.sms ?? userDoc.data().notificationPreferences?.sms ?? true,
+    email:
+      payload.notificationPreferences?.email ??
+      userDoc.data().notificationPreferences?.email ??
+      true,
+    app: payload.notificationPreferences?.app ?? userDoc.data().notificationPreferences?.app ?? true,
+  };
+
+  await userRef.update({
+    name: payload.name?.trim() ?? userDoc.data().name,
+    phone: payload.phone?.trim() ?? userDoc.data().phone ?? "",
+    address: payload.address?.trim() ?? userDoc.data().address ?? "",
+    preferredPaymentMethod:
+      payload.preferredPaymentMethod?.trim() ??
+      userDoc.data().preferredPaymentMethod ??
+      "UPI",
+    upiId: payload.upiId?.trim() ?? userDoc.data().upiId ?? "",
+    bankAccount: payload.bankAccount?.trim() ?? userDoc.data().bankAccount ?? "",
+    notificationPreferences: nextNotificationPreferences,
+    updatedAt: now,
+    updatedAtServer: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  const updatedDoc = await userRef.get();
+  return sanitizeUser(updatedDoc.data());
+}
+
 async function ensureAdminUser() {
   const adminEmail = (process.env.ADMIN_EMAIL || "admin@revastra.com").trim().toLowerCase();
   const adminName = (process.env.ADMIN_NAME || "ReVastra Admin").trim();
@@ -154,9 +235,53 @@ async function ensureAdminUser() {
   });
 }
 
+async function ensurePartnerUsers() {
+  const collectorEmail = (
+    process.env.COLLECTOR_EMAIL || "collector@revastra.com"
+  )
+    .trim()
+    .toLowerCase();
+  const collectorName = (
+    process.env.COLLECTOR_NAME || "Local Scrap Network"
+  ).trim();
+  const collectorPassword =
+    process.env.COLLECTOR_PASSWORD || "Collector@123";
+
+  const collectorUser = await findUserByEmail(collectorEmail);
+
+  if (!collectorUser) {
+    await createUser({
+      name: collectorName,
+      email: collectorEmail,
+      password: collectorPassword,
+      role: "collector",
+      organizationName: "Local Scrap Partner Network",
+      serviceArea: "Central India",
+    });
+  }
+
+  for (const recycler of recyclers) {
+    const existingRecyclerUser = await findUserByEmail(recycler.recyclerOpsEmail);
+
+    if (!existingRecyclerUser) {
+      await createUser({
+        name: recycler.recyclerOpsName,
+        email: recycler.recyclerOpsEmail,
+        password: process.env.RECYCLER_PASSWORD || "Recycler@123",
+        role: "recycler",
+        organizationName: recycler.name,
+        serviceArea: recycler.location,
+        managedRecyclerId: recycler.id,
+      });
+    }
+  }
+}
+
 module.exports = {
   createUser,
   ensureAdminUser,
+  ensurePartnerUsers,
   getUserById,
   loginUser,
+  updateUserProfile,
 };

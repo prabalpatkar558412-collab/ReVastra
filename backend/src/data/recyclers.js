@@ -7,6 +7,11 @@ const recyclers = [
     pickup: true,
     offerBonus: 200,
     rating: 4.7,
+    certified: true,
+    contactPhone: "+91 98765 11001",
+    dropCenter: "Morar Industrial Area, Gwalior",
+    recyclerOpsEmail: "greencycle@revastra.com",
+    recyclerOpsName: "GreenCycle Operations",
   },
   {
     id: "eco-scrap-solutions",
@@ -16,6 +21,11 @@ const recyclers = [
     pickup: true,
     offerBonus: 100,
     rating: 4.5,
+    certified: true,
+    contactPhone: "+91 98765 11002",
+    dropCenter: "Govindpura Industrial Estate, Bhopal",
+    recyclerOpsEmail: "ecoscrap@revastra.com",
+    recyclerOpsName: "EcoScrap Operations",
   },
   {
     id: "urban-ewaste-hub",
@@ -25,6 +35,11 @@ const recyclers = [
     pickup: false,
     offerBonus: 50,
     rating: 4.2,
+    certified: true,
+    contactPhone: "+91 98765 11003",
+    dropCenter: "Dewas Naka Recycling Cluster, Indore",
+    recyclerOpsEmail: "urbanewaste@revastra.com",
+    recyclerOpsName: "Urban E-Waste Operations",
   },
 ];
 

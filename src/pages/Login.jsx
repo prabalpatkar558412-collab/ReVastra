@@ -5,8 +5,36 @@ import { useAuth } from "../context/AuthContext";
 const tabs = [
   { key: "user-login", label: "User Login" },
   { key: "user-register", label: "User Register" },
+  { key: "collector-login", label: "Collector Login" },
+  { key: "recycler-login", label: "Recycler Login" },
   { key: "admin-login", label: "Admin Login" },
 ];
+
+function getRedirectPath(role, fallbackPath) {
+  if (role === "admin") {
+    return "/admin";
+  }
+  if (role === "collector") {
+    return "/collector";
+  }
+  if (role === "recycler") {
+    return "/recycler";
+  }
+  return fallbackPath || "/dashboard";
+}
+
+function getExpectedRole(activeTab) {
+  if (activeTab === "admin-login") {
+    return "admin";
+  }
+  if (activeTab === "collector-login") {
+    return "collector";
+  }
+  if (activeTab === "recycler-login") {
+    return "recycler";
+  }
+  return "user";
+}
 
 export default function Login() {
   const location = useLocation();
@@ -44,17 +72,16 @@ export default function Login() {
         return;
       }
 
-      const expectedRole = activeTab === "admin-login" ? "admin" : "user";
       const user = await login({
         email: formData.email,
         password: formData.password,
-        role: expectedRole,
+        role: getExpectedRole(activeTab),
       });
 
-      const redirectPath =
-        user.role === "admin"
-          ? "/admin"
-          : location.state?.from?.pathname || "/dashboard";
+      const redirectPath = getRedirectPath(
+        user.role,
+        location.state?.from?.pathname
+      );
 
       navigate(redirectPath, {
         replace: true,
@@ -67,20 +94,20 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-3xl mx-auto">
         <div className="bg-white shadow-lg rounded-3xl p-8 mb-8">
           <p className="text-green-600 font-semibold mb-2">Secure Access</p>
           <h1 className="text-4xl font-bold text-gray-800 mb-3">
             Login To ReVastra
           </h1>
           <p className="text-gray-500">
-            Users can access their dashboard while admins can access the
-            recycler operations panel.
+            Consumers, collectors, certified recyclers, and platform admins can
+            access their dedicated dashboards from here.
           </p>
         </div>
 
         <div className="bg-white shadow-lg rounded-3xl p-8">
-          <div className="grid sm:grid-cols-3 gap-3 mb-8">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-8">
             {tabs.map((tab) => (
               <button
                 key={tab.key}
@@ -104,6 +131,19 @@ export default function Login() {
             <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
               Admin login uses the seeded admin account configured in the
               backend `.env`.
+            </div>
+          ) : null}
+
+          {activeTab === "collector-login" ? (
+            <div className="mb-6 rounded-xl border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-yellow-700">
+              Demo collector account: collector@revastra.com / Collector@123
+            </div>
+          ) : null}
+
+          {activeTab === "recycler-login" ? (
+            <div className="mb-6 rounded-xl border border-purple-200 bg-purple-50 px-4 py-3 text-sm text-purple-700">
+              Demo recycler accounts are seeded from the recycler directory. For
+              example: greencycle@revastra.com / Recycler@123
             </div>
           ) : null}
 
@@ -172,6 +212,10 @@ export default function Login() {
                 ? "Create User Account"
                 : activeTab === "admin-login"
                 ? "Login As Admin"
+                : activeTab === "collector-login"
+                ? "Login As Collector"
+                : activeTab === "recycler-login"
+                ? "Login As Recycler"
                 : "Login As User"}
             </button>
           </form>

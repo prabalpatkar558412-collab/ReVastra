@@ -1,8 +1,36 @@
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
+function getDashboardPath(role) {
+  if (role === "admin") {
+    return "/admin";
+  }
+  if (role === "collector") {
+    return "/collector";
+  }
+  if (role === "recycler") {
+    return "/recycler";
+  }
+  return "/dashboard";
+}
+
+function getDashboardLabel(role) {
+  if (role === "admin") {
+    return "Admin";
+  }
+  if (role === "collector") {
+    return "Collector";
+  }
+  if (role === "recycler") {
+    return "Recycler";
+  }
+  return "Dashboard";
+}
+
 export default function Navbar() {
   const { isAuthenticated, logout, user } = useAuth();
+  const dashboardPath = getDashboardPath(user?.role);
+  const dashboardLabel = getDashboardLabel(user?.role);
 
   return (
     <nav className="bg-white shadow-md px-6 py-4">
@@ -15,21 +43,18 @@ export default function Navbar() {
           <Link to="/" className="hover:text-green-600 transition">
             Home
           </Link>
-          <Link to="/sell" className="hover:text-green-600 transition">
-            Sell Device
-          </Link>
+
+          {user?.role === "user" || !isAuthenticated ? (
+            <Link to="/sell" className="hover:text-green-600 transition">
+              Sell Device
+            </Link>
+          ) : null}
 
           {isAuthenticated ? (
             <>
-              <Link to="/dashboard" className="hover:text-green-600 transition">
-                Dashboard
+              <Link to={dashboardPath} className="hover:text-green-600 transition">
+                {dashboardLabel}
               </Link>
-
-              {user?.role === "admin" ? (
-                <Link to="/admin" className="hover:text-green-600 transition">
-                  Admin
-                </Link>
-              ) : null}
 
               <button
                 type="button"

@@ -1,12 +1,14 @@
 const { admin, db } = require("../config/firebase");
 const { getUserById } = require("./auth.service");
 const { logPickupCreated } = require("./activity.service");
+const { recyclers } = require("../data/recyclers");
 
 const pickupRequestsCollection = db.collection("pickupRequests");
 const submissionsCollection = db.collection("deviceSubmissions");
 const usersCollection = db.collection("users");
 
 async function createPickupRequest(userId, payload) {
+  const currentUser = await getUserById(userId);
   const submissionRef = submissionsCollection.doc(payload.submissionId);
   const submissionDoc = await submissionRef.get();
 
@@ -17,6 +19,15 @@ async function createPickupRequest(userId, payload) {
   }
 
   const submission = submissionDoc.data();
+  const matchedRecycler = recyclers.find(
+    (recycler) => recycler.id === payload.recyclerId
+  );
+
+  if (!matchedRecycler) {
+    const error = new Error("Selected recycler is not available");
+    error.statusCode = 400;
+    throw error;
+  }
 
   if (!Number.isFinite(submission.estimatedValue)) {
     const error = new Error(
@@ -47,6 +58,14 @@ async function createPickupRequest(userId, payload) {
   const now = new Date().toISOString();
   const finalOffer = Number(payload.finalOffer);
   const ewasteSavedKg = Number(submission.impact?.ewasteSavedKg || 0);
+  const rewardPointsEarned = Math.max(10, Math.round(finalOffer / 20));
+  const assignedCollectorName =
+    process.env.COLLECTOR_NAME || "Local Scrap Network";
+  const assignedCollectorPhone =
+    process.env.COLLECTOR_PHONE || "+91 98765 22001";
+  const assignedCollectorPhoto =
+    process.env.COLLECTOR_PHOTO_URL ||
+    "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=320&q=80";
 
   const pickupRequest = {
     pickupId: pickupRef.id,
@@ -54,13 +73,29 @@ async function createPickupRequest(userId, payload) {
     userId,
     recyclerId: payload.recyclerId,
     recyclerName: payload.recyclerName,
+    recyclerOpsEmail: matchedRecycler.recyclerOpsEmail,
     name: payload.name,
     address: payload.address,
     contact: payload.contact,
     pickupDate: payload.pickupDate,
     finalOffer,
+    finalVerifiedValue: finalOffer,
+    rewardPointsEarned,
+    paymentMethod: currentUser?.preferredPaymentMethod || "UPI",
     pickupAvailable: Boolean(payload.pickup),
     status: "pending",
+    assignedCollectorName,
+    assignedCollectorEmail:
+      process.env.COLLECTOR_EMAIL || "collector@revastra.com",
+    assignedCollectorPhone,
+    assignedCollectorPhoto,
+    collectorStatus: "assigned",
+    recyclerStatus: "awaiting_device",
+    paymentStatus: "pending",
+    processingMethod: null,
+    collectorNotes: "",
+    recyclerNotes: "",
+    dropCenter: matchedRecycler.dropCenter,
     deviceType: submission.deviceType,
     brand: submission.brand,
     model: submission.model,
@@ -79,8 +114,15 @@ async function createPickupRequest(userId, payload) {
   batch.update(submissionRef, {
     userId,
     selectedRecyclerId: payload.recyclerId,
+    selectedRecyclerName: payload.recyclerName,
     pickupRequestId: pickupRef.id,
     status: "pickup_requested",
+    assignedCollectorName: pickupRequest.assignedCollectorName,
+    assignedCollectorEmail: pickupRequest.assignedCollectorEmail,
+    collectorStatus: pickupRequest.collectorStatus,
+    recyclerStatus: pickupRequest.recyclerStatus,
+    paymentStatus: pickupRequest.paymentStatus,
+    finalVerifiedValue: pickupRequest.finalVerifiedValue,
     updatedAt: now,
     updatedAtServer: admin.firestore.FieldValue.serverTimestamp(),
   });
@@ -90,6 +132,7 @@ async function createPickupRequest(userId, payload) {
     totalEarnings: admin.firestore.FieldValue.increment(finalOffer),
     devicesRecycled: admin.firestore.FieldValue.increment(1),
     ewasteSavedKg: admin.firestore.FieldValue.increment(ewasteSavedKg),
+    rewardPoints: admin.firestore.FieldValue.increment(rewardPointsEarned),
     updatedAt: now,
     updatedAtServer: admin.firestore.FieldValue.serverTimestamp(),
   });

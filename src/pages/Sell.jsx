@@ -246,6 +246,7 @@ export default function Sell() {
                 <input
                   type="file"
                   accept="image/png,image/jpeg,image/webp,image/heic,image/heif"
+                  capture="environment"
                   onChange={handleImageChange}
                   className="hidden"
                 />

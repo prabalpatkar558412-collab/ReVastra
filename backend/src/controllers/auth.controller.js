@@ -2,6 +2,7 @@ const {
   createUser,
   getUserById,
   loginUser,
+  updateUserProfile,
 } = require("../services/auth.service");
 
 function validateRegisterBody(body) {
@@ -94,8 +95,23 @@ async function meController(req, res, next) {
   }
 }
 
+async function updateMeController(req, res, next) {
+  try {
+    const user = await updateUserProfile(req.user.userId, req.body || {});
+
+    res.status(200).json({
+      success: true,
+      message: "Profile updated successfully",
+      data: user,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   loginController,
   meController,
   registerController,
+  updateMeController,
 };

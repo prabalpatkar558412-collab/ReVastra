@@ -109,6 +109,48 @@ async function logPickupStatusUpdated({ userId, pickupRequest, nextStatus }) {
   });
 }
 
+async function logCollectorStatusUpdated({
+  userId,
+  pickupRequest,
+  nextStatus,
+}) {
+  return createActivityLog({
+    userId,
+    submissionId: pickupRequest.submissionId,
+    pickupId: pickupRequest.pickupId,
+    type: "collector_status_updated",
+    title: `Collector stage: ${formatStatus(nextStatus)}`,
+    description: `${pickupRequest.assignedCollectorName} marked the request as ${formatStatus(
+      nextStatus
+    )}`,
+    metadata: {
+      collectorName: pickupRequest.assignedCollectorName,
+      status: nextStatus,
+    },
+  });
+}
+
+async function logRecyclerStageUpdated({
+  userId,
+  pickupRequest,
+  nextStatus,
+}) {
+  return createActivityLog({
+    userId,
+    submissionId: pickupRequest.submissionId,
+    pickupId: pickupRequest.pickupId,
+    type: "recycler_stage_updated",
+    title: `Recycler stage: ${formatStatus(nextStatus)}`,
+    description: `${pickupRequest.recyclerName} updated processing to ${formatStatus(
+      nextStatus
+    )}`,
+    metadata: {
+      recyclerName: pickupRequest.recyclerName,
+      status: nextStatus,
+    },
+  });
+}
+
 async function getRecentActivityForUser(userId, limit = 6) {
   const snapshot = await activityLogsCollection
     .where("userId", "==", userId)
@@ -126,8 +168,10 @@ async function getRecentActivityForUser(userId, limit = 6) {
 
 module.exports = {
   getRecentActivityForUser,
+  logCollectorStatusUpdated,
   logEstimateGenerated,
   logPickupCreated,
   logPickupStatusUpdated,
+  logRecyclerStageUpdated,
   logSubmissionCreated,
 };

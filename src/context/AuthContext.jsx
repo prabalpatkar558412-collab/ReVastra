@@ -18,10 +18,28 @@ const storageKeys = {
   user: "revastra_auth_user",
 };
 
+function getSessionStorage() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  return window.sessionStorage;
+}
+
+function getLegacyLocalStorage() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  return window.localStorage;
+}
+
 export function AuthProvider({ children }) {
-  const [token, setToken] = useState(() => localStorage.getItem(storageKeys.token));
+  const [token, setToken] = useState(() => {
+    return getSessionStorage()?.getItem(storageKeys.token) || null;
+  });
   const [user, setUser] = useState(() => {
-    const storedUser = localStorage.getItem(storageKeys.user);
+    const storedUser = getSessionStorage()?.getItem(storageKeys.user);
     return storedUser ? JSON.parse(storedUser) : null;
   });
   const [isLoading, setIsLoading] = useState(false);
@@ -33,20 +51,43 @@ export function AuthProvider({ children }) {
   }, []);
 
   useEffect(() => {
+    const storage = getSessionStorage();
+
+    if (!storage) {
+      return;
+    }
+
     if (token) {
-      localStorage.setItem(storageKeys.token, token);
+      storage.setItem(storageKeys.token, token);
     } else {
-      localStorage.removeItem(storageKeys.token);
+      storage.removeItem(storageKeys.token);
     }
   }, [token]);
 
   useEffect(() => {
+    const storage = getSessionStorage();
+
+    if (!storage) {
+      return;
+    }
+
     if (user) {
-      localStorage.setItem(storageKeys.user, JSON.stringify(user));
+      storage.setItem(storageKeys.user, JSON.stringify(user));
     } else {
-      localStorage.removeItem(storageKeys.user);
+      storage.removeItem(storageKeys.user);
     }
   }, [user]);
+
+  useEffect(() => {
+    const legacyStorage = getLegacyLocalStorage();
+
+    if (!legacyStorage) {
+      return;
+    }
+
+    legacyStorage.removeItem(storageKeys.token);
+    legacyStorage.removeItem(storageKeys.user);
+  }, []);
 
   const authFetch = useCallback(
     async (path, options = {}) => {
