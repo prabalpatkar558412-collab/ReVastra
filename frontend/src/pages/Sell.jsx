@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { getAuth } from "firebase/auth";
 import { saveDevice } from "../services/deviceService";
 
 export default function Sell() {
@@ -118,9 +119,7 @@ export default function Sell() {
 
       const nextDeviceType = parsed.deviceType || "";
       const nextBrand = parsed.likelyBrand || "";
-      const nextModel = parsed.exactModelReliable
-        ? parsed.likelyModel || ""
-        : "";
+      const nextModel = parsed.exactModelReliable ? parsed.likelyModel || "" : "";
       const nextCondition = normalizeCondition(parsed.visibleCondition);
       const nextWorking = normalizeWorking(parsed.visibleCondition);
 
@@ -175,8 +174,19 @@ export default function Sell() {
     e.preventDefault();
 
     try {
+      const auth = getAuth();
+      const currentUser = auth.currentUser;
+
+      if (!currentUser) {
+        setAiError("Please login first.");
+        navigate("/login");
+        return;
+      }
+
       const payload = {
         ...formData,
+        uid: currentUser.uid,
+        userEmail: currentUser.email || "",
         imageName,
         imagePreview,
         status: "submitted",
@@ -288,9 +298,7 @@ export default function Sell() {
 
                 {aiError && (
                   <div className="mt-4 p-4 rounded-2xl bg-red-50 border border-red-100">
-                    <h3 className="font-semibold text-red-700 mb-1">
-                      Error
-                    </h3>
+                    <h3 className="font-semibold text-red-700 mb-1">Error</h3>
                     <p className="text-sm text-red-600 break-words">
                       {aiError}
                     </p>

@@ -1,6 +1,14 @@
 import { useState } from "react";
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  collection,
+  getDocs,
+  query,
+  where,
+  limit,
+} from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 import { auth, db } from "../firebase";
 
@@ -52,10 +60,30 @@ export default function Login() {
 
       if (role === "admin") {
         navigate("/admin");
-      } else if (role === "recycler") {
+        return;
+      }
+
+      if (role === "recycler") {
         navigate("/dashboard/recycler");
-      } else if (role === "startup_owner") {
+        return;
+      }
+
+      if (role === "startup_owner") {
         navigate("/dashboard/startup");
+        return;
+      }
+
+      // normal user ke liye device check
+      const deviceQuery = query(
+        collection(db, "devices"),
+        where("uid", "==", uid),
+        limit(1)
+      );
+
+      const deviceSnap = await getDocs(deviceQuery);
+
+      if (deviceSnap.empty) {
+        navigate("/sell");
       } else {
         navigate("/dashboard");
       }

@@ -1,15 +1,25 @@
 import { useEffect, useState } from "react";
-import { getDevices } from "../services/deviceService";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { getAuth } from "firebase/auth";
+import { getDevicesByUser } from "../services/deviceService";
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const [devices, setDevices] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadDevices = async () => {
       try {
-        const data = await getDevices();
+        const auth = getAuth();
+        const currentUser = auth.currentUser;
+
+        if (!currentUser) {
+          navigate("/login");
+          return;
+        }
+
+        const data = await getDevicesByUser(currentUser.uid);
         setDevices(data);
       } catch (error) {
         console.error("Failed to fetch devices:", error);
@@ -19,9 +29,10 @@ export default function Dashboard() {
     };
 
     loadDevices();
-  }, []);
+  }, [navigate]);
 
   const totalDevices = devices.length;
+
   const totalEarnings = devices.reduce((sum, device) => {
     const age = Number(device.age || 0);
 
@@ -71,10 +82,10 @@ export default function Dashboard() {
             Firebase Powered Dashboard
           </p>
           <h1 className="text-3xl font-bold text-gray-800 mb-2">
-            Dashboard
+            My Dashboard
           </h1>
           <p className="text-gray-500">
-            Live submissions and insights from Cloud Firestore.
+            Your submissions and insights from Cloud Firestore.
           </p>
         </div>
 
