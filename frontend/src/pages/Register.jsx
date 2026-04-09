@@ -1,9 +1,12 @@
 import { useState } from "react";
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, signOut } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
+import { useNavigate, Link } from "react-router-dom";
 import { auth, db } from "../firebase";
 
 export default function Register() {
+  const navigate = useNavigate();
+
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -37,15 +40,21 @@ export default function Register() {
         name: formData.name,
         email: formData.email,
         role: "user",
+        isProfileComplete: false,
         createdAt: new Date().toISOString(),
       });
 
-      setMessage("User registered successfully");
+      await signOut(auth);
+
+      setMessage("User registered successfully. Please login.");
+
       setFormData({
         name: "",
         email: "",
         password: "",
       });
+
+      navigate("/login");
     } catch (error) {
       setMessage(error.message);
     } finally {
@@ -101,6 +110,13 @@ export default function Register() {
         {message && (
           <p className="mt-4 text-center text-sm text-gray-700">{message}</p>
         )}
+
+        <p className="mt-4 text-center text-sm text-gray-600">
+          Already have an account?{" "}
+          <Link to="/login" className="text-green-600 font-medium">
+            Login
+          </Link>
+        </p>
       </div>
     </div>
   );
