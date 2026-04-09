@@ -470,10 +470,10 @@
 //     </div>
 //   );
 // }
-import { useEffect, useState } from "react";
+ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getAuth } from "firebase/auth";
-import { saveDevice } from "../services/deviceService";
+import { saveDevice, uploadDeviceImage } from "../services/deviceService";
 
 export default function Sell() {
   const navigate = useNavigate();
@@ -494,6 +494,8 @@ export default function Sell() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiSummary, setAiSummary] = useState("");
   const [aiError, setAiError] = useState("");
+  const [submitError, setSubmitError] = useState("");
+  const [aiResult, setAiResult] = useState(null);
 
   useEffect(() => {
     return () => {
@@ -512,22 +514,28 @@ export default function Sell() {
     }));
   };
 
-  const handleImageChange = (e) => {
-    const file = e.target.files?.[0];
+  const normalizeDeviceType = (value) => {
+    if (!value) return "";
+    const v = String(value).toLowerCase();
 
-    if (!file) return;
-
-    if (imagePreview) {
-      URL.revokeObjectURL(imagePreview);
+    if (v.includes("phone") || v.includes("smartphone") || v.includes("mobile")) {
+      return "Phone";
+    }
+    if (v.includes("laptop") || v.includes("notebook")) {
+      return "Laptop";
+    }
+    if (v.includes("tablet") || v.includes("ipad")) {
+      return "Tablet";
+    }
+    if (
+      v.includes("headphone") ||
+      v.includes("earbud") ||
+      v.includes("earphone")
+    ) {
+      return "Headphones";
     }
 
-    const previewUrl = URL.createObjectURL(file);
-
-    setImageFile(file);
-    setImageName(file.name);
-    setImagePreview(previewUrl);
-    setAiSummary("");
-    setAiError("");
+    return "";
   };
 
   const normalizeCondition = (value) => {
@@ -558,6 +566,36 @@ export default function Sell() {
     return "";
   };
 
+  const handleImageChange = (e) => {
+    const file = e.target.files?.[0];
+
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setAiError("Please upload a valid image file.");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setAiError("Image size should be less than 5MB.");
+      return;
+    }
+
+    if (imagePreview) {
+      URL.revokeObjectURL(imagePreview);
+    }
+
+    const previewUrl = URL.createObjectURL(file);
+
+    setImageFile(file);
+    setImageName(file.name);
+    setImagePreview(previewUrl);
+    setAiSummary("");
+    setAiError("");
+    setSubmitError("");
+    setAiResult(null);
+  };
+
   const handleAIAnalyze = async () => {
     if (!imageFile) {
       setAiError("Please upload an image first.");
@@ -567,6 +605,7 @@ export default function Sell() {
     setAiLoading(true);
     setAiError("");
     setAiSummary("");
+    setSubmitError("");
 
     try {
       const body = new FormData();
@@ -588,8 +627,9 @@ export default function Sell() {
       }
 
       const parsed = result.analysis;
+      setAiResult(parsed);
 
-      const nextDeviceType = parsed.deviceType || "";
+      const nextDeviceType = normalizeDeviceType(parsed.deviceType);
       const nextBrand = parsed.likelyBrand || "";
       const nextModel = parsed.exactModelReliable ? parsed.likelyModel || "" : "";
       const nextCondition = normalizeCondition(parsed.visibleCondition);
@@ -601,12 +641,12 @@ export default function Sell() {
 
       setFormData((prev) => ({
         ...prev,
-        deviceType: nextDeviceType || prev.deviceType,
-        brand: nextBrand || prev.brand,
-        model: nextModel || prev.model,
-        condition: nextCondition || prev.condition,
-        working: nextWorking || prev.working,
-        description: nextSummary || prev.description,
+        deviceType: prev.deviceType || nextDeviceType,
+        brand: prev.brand || nextBrand,
+        model: prev.model || nextModel,
+        condition: prev.condition || nextCondition,
+        working: prev.working || nextWorking,
+        description: prev.description || nextSummary,
       }));
 
       setAiSummary(
@@ -640,6 +680,8 @@ export default function Sell() {
     setImageName("");
     setAiSummary("");
     setAiError("");
+    setSubmitError("");
+    setAiResult(null);
   };
 
   const handleSubmit = async (e) => {
@@ -650,9 +692,15 @@ export default function Sell() {
       const currentUser = auth.currentUser;
 
       if (!currentUser) {
-        setAiError("Please login first.");
+        setSubmitError("Please login first.");
         navigate("/login");
         return;
+      }
+
+      let imageURL = "";
+
+      if (imageFile) {
+        imageURL = await uploadDeviceImage(imageFile, currentUser.uid);
       }
 
       const payload = {
@@ -660,7 +708,9 @@ export default function Sell() {
         uid: currentUser.uid,
         userEmail: currentUser.email || "",
         imageName,
-        imagePreview,
+        imageURL,
+        aiSummary,
+        aiResult: aiResult || null,
         status: "submitted",
         createdAt: new Date().toISOString(),
       };
@@ -675,7 +725,7 @@ export default function Sell() {
       });
     } catch (error) {
       console.error("Firebase save error:", error);
-      setAiError("Failed to save to Firebase");
+      setSubmitError("Failed to save to Firebase.");
     }
   };
 
@@ -757,8 +807,41 @@ export default function Sell() {
                   </button>
                 </div>
 
-                {aiSummary && (
+                {aiResult && (
                   <div className="mt-4 p-4 rounded-2xl bg-blue-50 border border-blue-100">
+                    <h3 className="font-semibold text-gray-800 mb-3">
+                      AI Analysis
+                    </h3>
+                    <div className="space-y-2 text-sm text-gray-700">
+                      <p>
+                        <strong>Device Type:</strong> {aiResult.deviceType || "Unknown"}
+                      </p>
+                      <p>
+                        <strong>Likely Brand:</strong> {aiResult.likelyBrand || "Unknown"}
+                      </p>
+                      <p>
+                        <strong>Likely Model:</strong>{" "}
+                        {aiResult.exactModelReliable
+                          ? aiResult.likelyModel || "Unknown"
+                          : "Model not confidently identified"}
+                      </p>
+                      <p>
+                        <strong>Visible Condition:</strong>{" "}
+                        {aiResult.visibleCondition || "Unknown"}
+                      </p>
+                      <p>
+                        <strong>Confidence:</strong> {aiResult.confidence ?? 0}%
+                      </p>
+                      <p>
+                        <strong>Reasoning:</strong>{" "}
+                        {aiResult.reasoning || "No reasoning available"}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {aiSummary && (
+                  <div className="mt-4 p-4 rounded-2xl bg-green-50 border border-green-100">
                     <h3 className="font-semibold text-gray-800 mb-2">
                       AI Summary
                     </h3>
@@ -770,9 +853,18 @@ export default function Sell() {
 
                 {aiError && (
                   <div className="mt-4 p-4 rounded-2xl bg-red-50 border border-red-100">
-                    <h3 className="font-semibold text-red-700 mb-1">Error</h3>
+                    <h3 className="font-semibold text-red-700 mb-1">AI Error</h3>
+                    <p className="text-sm text-red-600 break-words">{aiError}</p>
+                  </div>
+                )}
+
+                {submitError && (
+                  <div className="mt-4 p-4 rounded-2xl bg-red-50 border border-red-100">
+                    <h3 className="font-semibold text-red-700 mb-1">
+                      Submit Error
+                    </h3>
                     <p className="text-sm text-red-600 break-words">
-                      {aiError}
+                      {submitError}
                     </p>
                   </div>
                 )}
@@ -825,6 +917,9 @@ export default function Sell() {
                   className="w-full border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-green-500"
                   required
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  If AI cannot detect exact model, please enter it manually.
+                </p>
               </div>
 
               <div>
@@ -915,13 +1010,13 @@ export default function Sell() {
                   📷 Detects device from uploaded image
                 </div>
                 <div className="p-3 rounded-xl bg-blue-50 border border-blue-100">
-                  🤖 Autofills brand, model, condition
+                  🤖 Suggests brand, model, and condition
                 </div>
                 <div className="p-3 rounded-xl bg-yellow-50 border border-yellow-100">
-                  ✍️ User can review and edit details
+                  ✍️ User reviews and edits details
                 </div>
                 <div className="p-3 rounded-xl bg-purple-50 border border-purple-100">
-                  ⚡ Saves submission to Firebase
+                  ⚡ Saves image and submission to Firebase
                 </div>
               </div>
             </div>

@@ -6,6 +6,9 @@ import { GoogleGenAI } from "@google/genai";
 
 dotenv.config();
 
+console.log("GEMINI_API_KEY exists:", !!process.env.GEMINI_API_KEY);
+console.log("PORT:", process.env.PORT);
+
 const app = express();
 
 const upload = multer({
@@ -22,66 +25,124 @@ const upload = multer({
   },
 });
 
-// TEMPORARY: allow all origins for local testing
 app.use(cors());
-
 app.use(express.json());
 
 app.get("/", (req, res) => {
   res.send("Backend is running");
 });
 
-console.log("Gemini key loaded:", !!process.env.GEMINI_API_KEY);
-
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
 });
 
+function extractJsonText(text) {
+  if (!text) return "";
+
+  let cleaned = String(text).trim();
+
+  if (cleaned.startsWith("```")) {
+    cleaned = cleaned
+      .replace(/^```json\s*/i, "")
+      .replace(/^```\s*/i, "")
+      .replace(/\s*```$/, "")
+      .trim();
+  }
+
+  return cleaned;
+}
+
 function safeJsonParse(text) {
   try {
-    return JSON.parse(text);
+    const cleaned = extractJsonText(text);
+    return JSON.parse(cleaned);
   } catch {
     return null;
   }
+}
+
+function normalizeDeviceType(value) {
+  const v = String(value || "").toLowerCase();
+
+  if (v.includes("phone") || v.includes("smartphone") || v.includes("mobile")) {
+    return "Phone";
+  }
+  if (v.includes("laptop") || v.includes("notebook")) {
+    return "Laptop";
+  }
+  if (v.includes("tablet") || v.includes("ipad")) {
+    return "Tablet";
+  }
+  if (
+    v.includes("headphone") ||
+    v.includes("earbud") ||
+    v.includes("earphone")
+  ) {
+    return "Headphones";
+  }
+
+  return "Unknown Device";
+}
+
+function normalizeCondition(value) {
+  const v = String(value || "").toLowerCase();
+
+  if (v.includes("excellent")) return "Excellent";
+  if (v.includes("good")) return "Good";
+  if (v.includes("damaged")) return "Damaged";
+  if (v.includes("broken")) return "Damaged";
+  if (v.includes("cracked")) return "Damaged";
+  if (v.includes("dead")) return "Dead";
+
+  return "Unknown";
 }
 
 function normalizeResult(parsed) {
   const confidence = Number(parsed?.confidence ?? 0);
 
   return {
-    deviceType: parsed?.deviceType || "Unknown Device",
+    deviceType: normalizeDeviceType(parsed?.deviceType),
     likelyBrand: parsed?.likelyBrand || "Unknown Brand",
     likelyModel: parsed?.likelyModel || "Model not confidently identified",
-    visibleCondition: parsed?.visibleCondition || "Unknown",
+    visibleCondition: normalizeCondition(parsed?.visibleCondition),
     confidence: Number.isFinite(confidence) ? confidence : 0,
     reasoning:
       parsed?.reasoning ||
       "The image did not provide enough reliable detail for exact identification.",
-    exactModelReliable: confidence >= 85,
+    exactModelReliable: Number.isFinite(confidence) ? confidence >= 85 : false,
   };
 }
 
-app.post("/api/analyze-device", upload.single("image"), async (req, res) => {
-  console.log("AI route hit");
-
-  try {
-    console.log("File received:", !!req.file);
-
-    if (!req.file) {
+app.post("/api/analyze-device", (req, res) => {
+  upload.single("image")(req, res, async (uploadError) => {
+    if (uploadError) {
+      console.error("Upload error:", uploadError);
       return res.status(400).json({
         success: false,
-        message: "No image uploaded.",
+        message: uploadError.message || "Image upload failed.",
       });
     }
 
-    if (!process.env.GEMINI_API_KEY) {
-      return res.status(500).json({
-        success: false,
-        message: "GEMINI_API_KEY is missing in server/.env",
-      });
-    }
+    try {
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          message: "No image uploaded.",
+        });
+      }
 
-    const prompt = `
+      console.log("req.file name:", req.file?.originalname);
+      console.log("req.file size:", req.file?.size);
+      console.log("req.file type:", req.file?.mimetype);
+
+      if (!process.env.GEMINI_API_KEY) {
+        return res.status(500).json({
+          success: false,
+          message: "GEMINI_API_KEY is missing in .env",
+        });
+      }
+
+      const prompt = `
 Analyze this uploaded electronic device image.
 
 Rules:
@@ -102,62 +163,68 @@ Return ONLY valid JSON:
   "confidence": 0,
   "reasoning": "short explanation"
 }
-    `.trim();
+      `.trim();
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: [
-        {
-          role: "user",
-          parts: [
-            { text: prompt },
-            {
-              inlineData: {
-                mimeType: req.file.mimetype,
-                data: req.file.buffer.toString("base64"),
-              },
-            },
-          ],
+      const response = await ai.models.generateContent({
+        model: "gemini-flash-latest",
+        config: {
+          responseMimeType: "application/json",
         },
-      ],
-    });
+        contents: [
+          {
+            role: "user",
+            parts: [
+              { text: prompt },
+              {
+                inlineData: {
+                  mimeType: req.file.mimetype,
+                  data: req.file.buffer.toString("base64"),
+                },
+              },
+            ],
+          },
+        ],
+      });
 
-    console.log("Gemini response received");
+      console.log("Gemini full response:", response);
+      console.log("Gemini text:", response?.text);
 
-    const rawText = (response.text || "").trim();
-    console.log("Raw Gemini output:", rawText);
+      const rawText = String(response?.text || "").trim();
+      const parsed = safeJsonParse(rawText);
 
-    const parsed = safeJsonParse(rawText);
+      if (!parsed) {
+        return res.status(200).json({
+          success: true,
+          analysis: {
+            deviceType: "Unknown Device",
+            likelyBrand: "Unknown Brand",
+            likelyModel: "Model not confidently identified",
+            visibleCondition: "Unknown",
+            confidence: 0,
+            reasoning: "The AI response could not be parsed into structured JSON.",
+            exactModelReliable: false,
+          },
+          raw: rawText,
+        });
+      }
 
-    if (!parsed) {
       return res.status(200).json({
         success: true,
-        analysis: {
-          deviceType: "Unknown Device",
-          likelyBrand: "Unknown Brand",
-          likelyModel: "Model not confidently identified",
-          visibleCondition: "Unknown",
-          confidence: 0,
-          reasoning: "The AI response could not be parsed into structured JSON.",
-          exactModelReliable: false,
-        },
-        raw: rawText,
+        analysis: normalizeResult(parsed),
+      });
+    } catch (error) {
+      console.error("Analyze device error full:", error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Failed to analyze device image.",
+        error:
+          error?.message ||
+          error?.statusText ||
+          JSON.stringify(error, Object.getOwnPropertyNames(error)),
       });
     }
-
-    return res.status(200).json({
-      success: true,
-      analysis: normalizeResult(parsed),
-    });
-  } catch (error) {
-    console.error("Analyze device error:", error);
-
-    return res.status(500).json({
-      success: false,
-      message: "Failed to analyze device image.",
-      error: error.message || "Unknown server error",
-    });
-  }
+  });
 });
 
 app.listen(process.env.PORT || 5000, () => {
