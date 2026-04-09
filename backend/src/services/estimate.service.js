@@ -1,4 +1,5 @@
 const { admin, db } = require("../config/firebase");
+const { logEstimateGenerated } = require("./activity.service");
 
 function calculateEstimate(submission) {
   const basePrices = {
@@ -110,6 +111,11 @@ async function generateEstimate(submissionId) {
     status: "estimated",
     updatedAt: updatedSubmission.updatedAt,
     updatedAtServer: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  await logEstimateGenerated({
+    userId: submission.userId,
+    submission: updatedSubmission,
   });
 
   return updatedSubmission;

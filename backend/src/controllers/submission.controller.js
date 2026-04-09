@@ -33,7 +33,11 @@ async function createSubmissionController(req, res, next) {
       throw error;
     }
 
-    const submission = await createSubmission(req.body, req.file);
+    const submission = await createSubmission(
+      req.body,
+      req.file,
+      req.user?.userId || null
+    );
 
     res.status(201).json({
       success: true,

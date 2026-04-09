@@ -4,6 +4,7 @@ const {
   assertValidDeviceImage,
   validateDeviceImageWithGemini,
 } = require("./gemini.service");
+const { logSubmissionCreated } = require("./activity.service");
 
 function sanitizeFileName(fileName) {
   const extension = path.extname(fileName || "");
@@ -45,7 +46,7 @@ async function uploadSubmissionImage(submissionId, file) {
   };
 }
 
-async function createSubmission(payload, file) {
+async function createSubmission(payload, file, userId = null) {
   const imageValidation = await validateDeviceImageWithGemini(
     file,
     payload.deviceType
@@ -70,7 +71,7 @@ async function createSubmission(payload, file) {
 
   const submission = {
     submissionId,
-    userId: null,
+    userId,
     deviceType: payload.deviceType,
     brand: payload.brand,
     model: payload.model,
@@ -97,6 +98,11 @@ async function createSubmission(payload, file) {
     ...submission,
     createdAtServer: admin.firestore.FieldValue.serverTimestamp(),
     updatedAtServer: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  await logSubmissionCreated({
+    userId,
+    submission,
   });
 
   return submission;

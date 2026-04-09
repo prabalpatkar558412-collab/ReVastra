@@ -35,6 +35,26 @@ function getNextStatus(status) {
   return null;
 }
 
+function buildAdminQuery(filters) {
+  const searchParams = new URLSearchParams();
+
+  if (filters.q.trim()) {
+    searchParams.set("q", filters.q.trim());
+  }
+  if (filters.status) {
+    searchParams.set("status", filters.status);
+  }
+  if (filters.recycler) {
+    searchParams.set("recycler", filters.recycler);
+  }
+  if (filters.date) {
+    searchParams.set("date", filters.date);
+  }
+
+  const queryString = searchParams.toString();
+  return queryString ? `/admin/requests?${queryString}` : "/admin/requests";
+}
+
 export default function AdminDashboard() {
   const { authFetch, user } = useAuth();
   const [adminData, setAdminData] = useState(null);
@@ -43,13 +63,19 @@ export default function AdminDashboard() {
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [updatingRequestId, setUpdatingRequestId] = useState("");
+  const [filters, setFilters] = useState({
+    q: "",
+    status: "",
+    recycler: "",
+    date: "",
+  });
 
   const fetchAdminData = useCallback(async () => {
     try {
       setIsLoading(true);
       setErrorMessage("");
 
-      const response = await authFetch("/admin/requests");
+      const response = await authFetch(buildAdminQuery(filters));
       const result = await response.json();
 
       if (!response.ok || !result.success) {
@@ -62,11 +88,29 @@ export default function AdminDashboard() {
     } finally {
       setIsLoading(false);
     }
-  }, [authFetch]);
+  }, [authFetch, filters]);
 
   useEffect(() => {
     fetchAdminData();
   }, [fetchAdminData]);
+
+  const handleFilterChange = (event) => {
+    setFilters((previousFilters) => ({
+      ...previousFilters,
+      [event.target.name]: event.target.value,
+    }));
+    setExpandedRequestId(null);
+  };
+
+  const handleClearFilters = () => {
+    setFilters({
+      q: "",
+      status: "",
+      recycler: "",
+      date: "",
+    });
+    setExpandedRequestId(null);
+  };
 
   const handleStatusUpdate = async (request) => {
     const nextStatus = getNextStatus(request.status);
@@ -121,6 +165,10 @@ export default function AdminDashboard() {
 
   const requests = adminData?.requests || [];
   const submissions = adminData?.submissions || [];
+  const availableRecyclers = adminData?.availableRecyclers || [];
+  const hasActiveFilters = Boolean(
+    filters.q || filters.status || filters.recycler || filters.date
+  );
 
   const statCards = [
     {
@@ -173,6 +221,72 @@ export default function AdminDashboard() {
             Monitor incoming requests, manage pickup workflows, and track
             recycler operations from one place.
           </p>
+        </div>
+
+        <div className="bg-white shadow-md rounded-3xl p-5 sm:p-6 mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
+              Filters and Search
+            </h2>
+            <button
+              type="button"
+              onClick={handleClearFilters}
+              className="border border-gray-300 hover:bg-gray-100 text-gray-700 px-4 py-2 rounded-xl font-medium transition w-full sm:w-auto"
+            >
+              Clear Filters
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+            <input
+              type="text"
+              name="q"
+              value={filters.q}
+              onChange={handleFilterChange}
+              placeholder="Search user, device, recycler..."
+              className="w-full rounded-xl border px-4 py-3 outline-none focus:ring-2 focus:ring-green-500"
+            />
+
+            <select
+              name="status"
+              value={filters.status}
+              onChange={handleFilterChange}
+              className="w-full rounded-xl border px-4 py-3 outline-none focus:ring-2 focus:ring-green-500"
+            >
+              <option value="">All Statuses</option>
+              <option value="pending">Pending</option>
+              <option value="assigned">Assigned</option>
+              <option value="completed">Completed</option>
+            </select>
+
+            <select
+              name="recycler"
+              value={filters.recycler}
+              onChange={handleFilterChange}
+              className="w-full rounded-xl border px-4 py-3 outline-none focus:ring-2 focus:ring-green-500"
+            >
+              <option value="">All Recyclers</option>
+              {availableRecyclers.map((recyclerName) => (
+                <option key={recyclerName} value={recyclerName}>
+                  {recyclerName}
+                </option>
+              ))}
+            </select>
+
+            <input
+              type="date"
+              name="date"
+              value={filters.date}
+              onChange={handleFilterChange}
+              className="w-full rounded-xl border px-4 py-3 outline-none focus:ring-2 focus:ring-green-500"
+            />
+          </div>
+
+          <div className="mt-4 text-sm text-gray-500">
+            {hasActiveFilters
+              ? `Showing ${requests.length} filtered request(s).`
+              : "Showing all requests."}
+          </div>
         </div>
 
         {errorMessage ? (
@@ -335,7 +449,7 @@ export default function AdminDashboard() {
                     })
                   ) : (
                     <div className="rounded-2xl border bg-gray-50 p-6 text-gray-600">
-                      No pickup requests available yet.
+                      No pickup requests match the current filters.
                     </div>
                   )}
                 </div>
@@ -424,7 +538,7 @@ export default function AdminDashboard() {
                       ))
                     ) : (
                       <p className="text-gray-600">
-                        No user submissions found yet.
+                        No user submissions match the current filters.
                       </p>
                     )}
                   </div>

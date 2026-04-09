@@ -31,6 +31,24 @@ function authMiddleware(req, _res, next) {
   }
 }
 
+function optionalAuthMiddleware(req, _res, next) {
+  try {
+    const authorization = req.headers.authorization || "";
+
+    if (!authorization.startsWith("Bearer ")) {
+      next();
+      return;
+    }
+
+    const token = authorization.replace("Bearer ", "").trim();
+    req.user = jwt.verify(token, getJwtSecret());
+    next();
+  } catch (_error) {
+    req.user = null;
+    next();
+  }
+}
+
 function requireRole(role) {
   return (req, _res, next) => {
     if (!req.user || req.user.role !== role) {
@@ -46,5 +64,6 @@ function requireRole(role) {
 
 module.exports = {
   authMiddleware,
+  optionalAuthMiddleware,
   requireRole,
 };

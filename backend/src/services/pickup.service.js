@@ -1,5 +1,6 @@
 const { admin, db } = require("../config/firebase");
 const { getUserById } = require("./auth.service");
+const { logPickupCreated } = require("./activity.service");
 
 const pickupRequestsCollection = db.collection("pickupRequests");
 const submissionsCollection = db.collection("deviceSubmissions");
@@ -94,6 +95,11 @@ async function createPickupRequest(userId, payload) {
   });
 
   await batch.commit();
+
+  await logPickupCreated({
+    userId,
+    pickupRequest,
+  });
 
   const updatedUser = await getUserById(userId);
 

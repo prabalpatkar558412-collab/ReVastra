@@ -1,5 +1,6 @@
 const { db } = require("../config/firebase");
 const { getUserById } = require("./auth.service");
+const { getRecentActivityForUser } = require("./activity.service");
 
 function sortByNewest(items) {
   return [...items].sort((firstItem, secondItem) => {
@@ -14,20 +15,20 @@ function sortByNewest(items) {
   });
 }
 
-function buildRecentActivity(submissions, pickups) {
+function buildFallbackActivity(submissions, pickups) {
   const submissionActivities = submissions.map((submission) => ({
-    id: `submission-${submission.submissionId}`,
-    timestamp: submission.updatedAt || submission.createdAt,
+    activityId: `submission-${submission.submissionId}`,
+    createdAt: submission.updatedAt || submission.createdAt,
     title: `${submission.brand} ${submission.model} submission`,
-    description: `Status: ${submission.status.replace(/_/g, " ")}`,
+    description: `Status: ${String(submission.status || "").replace(/_/g, " ")}`,
     type: "submission",
   }));
 
   const pickupActivities = pickups.map((pickup) => ({
-    id: `pickup-${pickup.pickupId}`,
-    timestamp: pickup.updatedAt || pickup.createdAt,
+    activityId: `pickup-${pickup.pickupId}`,
+    createdAt: pickup.updatedAt || pickup.createdAt,
     title: `${pickup.recyclerName} pickup request`,
-    description: `Status: ${pickup.status.replace(/_/g, " ")} for ${pickup.pickupDate}`,
+    description: `Status: ${String(pickup.status || "").replace(/_/g, " ")} for ${pickup.pickupDate}`,
     type: "pickup",
   }));
 
@@ -52,9 +53,10 @@ async function getDashboardSummary(requestedUserId, currentUser) {
     throw error;
   }
 
-  const [submissionSnapshot, pickupSnapshot] = await Promise.all([
+  const [submissionSnapshot, pickupSnapshot, recentActivity] = await Promise.all([
     db.collection("deviceSubmissions").where("userId", "==", requestedUserId).get(),
     db.collection("pickupRequests").where("userId", "==", requestedUserId).get(),
+    getRecentActivityForUser(requestedUserId),
   ]);
 
   const submissions = sortByNewest(
@@ -77,7 +79,10 @@ async function getDashboardSummary(requestedUserId, currentUser) {
     stats,
     submissions,
     pickups,
-    recentActivity: buildRecentActivity(submissions, pickups),
+    recentActivity:
+      recentActivity.length > 0
+        ? recentActivity
+        : buildFallbackActivity(submissions, pickups),
   };
 }
 

@@ -1,4 +1,5 @@
 const { admin, db } = require("../config/firebase");
+const { logPickupStatusUpdated } = require("./activity.service");
 
 const allowedStatusTransitions = {
   pending: ["assigned"],
@@ -16,6 +17,103 @@ function sortByNewest(items) {
     ).getTime();
 
     return secondDate - firstDate;
+  });
+}
+
+function normalizeSearchValue(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function matchesSearch(request, searchQuery) {
+  if (!searchQuery) {
+    return true;
+  }
+
+  const searchableText = [
+    request.pickupId,
+    request.submissionId,
+    request.recyclerName,
+    request.deviceType,
+    request.brand,
+    request.model,
+    request.name,
+    request.contact,
+    request.user?.name,
+    request.user?.email,
+    request.submission?.suggestion,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return searchableText.includes(searchQuery);
+}
+
+function filterRequests(requests, filters) {
+  const searchQuery = normalizeSearchValue(filters.q);
+  const statusFilter = normalizeSearchValue(filters.status);
+  const recyclerFilter = normalizeSearchValue(filters.recycler);
+  const dateFilter = String(filters.date || "").trim();
+
+  return requests.filter((request) => {
+    if (statusFilter && request.status !== statusFilter) {
+      return false;
+    }
+
+    if (
+      recyclerFilter &&
+      normalizeSearchValue(request.recyclerName) !== recyclerFilter
+    ) {
+      return false;
+    }
+
+    if (dateFilter && String(request.pickupDate || "") !== dateFilter) {
+      return false;
+    }
+
+    if (!matchesSearch(request, searchQuery)) {
+      return false;
+    }
+
+    return true;
+  });
+}
+
+function filterSubmissions(submissions, filters) {
+  const searchQuery = normalizeSearchValue(filters.q);
+  const statusFilter = normalizeSearchValue(filters.status);
+  const recyclerFilter = normalizeSearchValue(filters.recycler);
+
+  return submissions.filter((submission) => {
+    if (statusFilter && normalizeSearchValue(submission.status) !== statusFilter) {
+      return false;
+    }
+
+    if (
+      recyclerFilter &&
+      normalizeSearchValue(submission.selectedRecyclerId || "") !== recyclerFilter &&
+      normalizeSearchValue(submission.selectedRecyclerName || "") !== recyclerFilter
+    ) {
+      return false;
+    }
+
+    if (!searchQuery) {
+      return true;
+    }
+
+    const searchableText = [
+      submission.submissionId,
+      submission.deviceType,
+      submission.brand,
+      submission.model,
+      submission.suggestion,
+      submission.status,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
+    return searchableText.includes(searchQuery);
   });
 }
 
@@ -61,7 +159,7 @@ function buildAdminStats(requests) {
   };
 }
 
-async function getAdminRequestsSummary() {
+async function getAdminRequestsSummary(filters = {}) {
   const [pickupSnapshot, submissionSnapshot, userSnapshot] = await Promise.all([
     db.collection("pickupRequests").get(),
     db.collection("deviceSubmissions").get(),
@@ -100,11 +198,35 @@ async function getAdminRequestsSummary() {
       };
     })
   );
+  const availableRecyclers = Array.from(
+    new Set(
+      requests.map((request) => request.recyclerName).filter(Boolean)
+    )
+  ).sort((firstRecycler, secondRecycler) =>
+    firstRecycler.localeCompare(secondRecycler)
+  );
+  const filteredRequests = filterRequests(requests, filters);
+  const filteredSubmissions = filterSubmissions(submissions, {
+    ...filters,
+    recycler:
+      requests.find(
+        (request) =>
+          normalizeSearchValue(request.recyclerName) ===
+          normalizeSearchValue(filters.recycler)
+      )?.recyclerId || filters.recycler,
+  });
 
   return {
-    stats: buildAdminStats(requests),
-    requests,
-    submissions: submissions.slice(0, 10),
+    stats: buildAdminStats(filteredRequests),
+    requests: filteredRequests,
+    submissions: filteredSubmissions,
+    availableRecyclers,
+    filters: {
+      q: filters.q || "",
+      status: filters.status || "",
+      recycler: filters.recycler || "",
+      date: filters.date || "",
+    },
   };
 }
 
@@ -153,6 +275,12 @@ async function updateAdminRequestStatus(pickupId, nextStatus) {
   }
 
   await batch.commit();
+
+  await logPickupStatusUpdated({
+    userId: pickupRequest.userId,
+    pickupRequest,
+    nextStatus: normalizedStatus,
+  });
 
   const updatedPickupDoc = await pickupRef.get();
   return updatedPickupDoc.data();

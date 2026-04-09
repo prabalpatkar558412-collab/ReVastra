@@ -11,9 +11,9 @@ function validateStatusUpdateBody(body) {
   }
 }
 
-async function getAdminRequestsController(_req, res, next) {
+async function getAdminRequestsController(req, res, next) {
   try {
-    const summary = await getAdminRequestsSummary();
+    const summary = await getAdminRequestsSummary(req.query);
 
     res.status(200).json({
       success: true,

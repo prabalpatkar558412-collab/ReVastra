@@ -219,7 +219,7 @@ export default function Dashboard() {
                 <ul className="space-y-3 text-gray-700">
                   {recentActivity.map((activity) => (
                     <li
-                      key={activity.id}
+                      key={activity.activityId || activity.id}
                       className="rounded-xl border bg-gray-50 p-4"
                     >
                       <p className="font-semibold text-gray-800">

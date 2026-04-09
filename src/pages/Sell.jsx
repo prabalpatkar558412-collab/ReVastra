@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 const apiBaseUrl =
   import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:5000/api";
 
 export default function Sell() {
   const navigate = useNavigate();
+  const { authFetch, isAuthenticated } = useAuth();
 
   const [formData, setFormData] = useState({
     deviceType: "",
@@ -66,10 +68,13 @@ export default function Sell() {
     }
 
     try {
-      const response = await fetch(`${apiBaseUrl}/submissions`, {
+      const requestOptions = {
         method: "POST",
         body: payload,
-      });
+      };
+      const response = isAuthenticated
+        ? await authFetch("/submissions", requestOptions)
+        : await fetch(`${apiBaseUrl}/submissions`, requestOptions);
 
       const result = await response.json();
 

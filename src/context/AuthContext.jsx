@@ -25,6 +25,12 @@ export function AuthProvider({ children }) {
     return storedUser ? JSON.parse(storedUser) : null;
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [isBootstrapping, setIsBootstrapping] = useState(Boolean(token));
+
+  const clearAuthState = useCallback(() => {
+    setToken(null);
+    setUser(null);
+  }, []);
 
   useEffect(() => {
     if (token) {
@@ -60,64 +66,114 @@ export function AuthProvider({ children }) {
     [token]
   );
 
-  const login = async ({ email, password, role }) => {
-    setIsLoading(true);
+  useEffect(() => {
+    let isMounted = true;
 
-    try {
-      const response = await fetch(`${apiBaseUrl}/auth/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, password, role }),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok || !result.success) {
-        throw new Error(result.message || "Login failed");
+    async function bootstrapSession() {
+      if (!token) {
+        setIsBootstrapping(false);
+        return;
       }
 
-      setToken(result.data.token);
-      setUser(result.data.user);
+      try {
+        const response = await fetch(`${apiBaseUrl}/auth/me`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        const result = await response.json();
 
-      return result.data.user;
-    } finally {
-      setIsLoading(false);
-    }
-  };
+        if (!response.ok || !result.success) {
+          throw new Error(result.message || "Session expired");
+        }
 
-  const register = async ({ name, email, password }) => {
-    setIsLoading(true);
-
-    try {
-      const response = await fetch(`${apiBaseUrl}/auth/register`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ name, email, password }),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok || !result.success) {
-        throw new Error(result.message || "Registration failed");
+        if (isMounted) {
+          setUser(result.data);
+        }
+      } catch {
+        if (isMounted) {
+          clearAuthState();
+        }
+      } finally {
+        if (isMounted) {
+          setIsBootstrapping(false);
+        }
       }
-
-      setToken(result.data.token);
-      setUser(result.data.user);
-
-      return result.data.user;
-    } finally {
-      setIsLoading(false);
     }
-  };
 
-  const logout = () => {
-    setToken(null);
-    setUser(null);
-  };
+    bootstrapSession();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [clearAuthState, token]);
+
+  const login = useCallback(
+    async ({ email, password, role }) => {
+      setIsLoading(true);
+
+      try {
+        const response = await fetch(`${apiBaseUrl}/auth/login`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ email, password, role }),
+        });
+
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+          throw new Error(result.message || "Login failed");
+        }
+
+        setToken(result.data.token);
+        setUser(result.data.user);
+        setIsBootstrapping(false);
+
+        return result.data.user;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    []
+  );
+
+  const register = useCallback(
+    async ({ name, email, password }) => {
+      setIsLoading(true);
+
+      try {
+        const response = await fetch(`${apiBaseUrl}/auth/register`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ name, email, password }),
+        });
+
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+          throw new Error(result.message || "Registration failed");
+        }
+
+        setToken(result.data.token);
+        setUser(result.data.user);
+        setIsBootstrapping(false);
+
+        return result.data.user;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    []
+  );
+
+  const logout = useCallback(() => {
+    clearAuthState();
+    setIsBootstrapping(false);
+  }, [clearAuthState]);
 
   const syncUser = useCallback((nextUser) => {
     setUser(nextUser || null);
@@ -127,6 +183,7 @@ export function AuthProvider({ children }) {
     () => ({
       authFetch,
       isAuthenticated: Boolean(token && user),
+      isBootstrapping,
       isLoading,
       login,
       logout,
@@ -135,7 +192,7 @@ export function AuthProvider({ children }) {
       token,
       user,
     }),
-    [authFetch, isLoading, syncUser, token, user]
+    [authFetch, isBootstrapping, isLoading, login, logout, register, syncUser, token, user]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
