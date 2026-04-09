@@ -10,6 +10,7 @@ import {
   limit,
 } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
+import { Eye, EyeOff, X } from "lucide-react";
 import { auth, db } from "../firebase";
 
 export default function Login() {
@@ -22,6 +23,7 @@ export default function Login() {
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleChange = (e) => {
     setFormData((prev) => ({
@@ -89,7 +91,16 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
-      <div className="w-full max-w-md bg-white shadow-lg rounded-2xl p-8">
+      <div className="relative w-full max-w-md bg-white shadow-lg rounded-2xl p-8">
+        {/* Close Icon */}
+        <button
+          type="button"
+          onClick={() => navigate("/")}
+          className="absolute top-4 right-4 text-gray-500 hover:text-black"
+        >
+          <X size={24} />
+        </button>
+
         <h2 className="text-2xl font-bold mb-6 text-center">Login</h2>
 
         <form onSubmit={handleLogin} className="space-y-4">
@@ -99,31 +110,41 @@ export default function Login() {
             placeholder="Enter your email"
             value={formData.email}
             onChange={handleChange}
-            className="w-full border rounded-lg px-4 py-3"
+            className="w-full border rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
             required
           />
 
-          <input
-            type="password"
-            name="password"
-            placeholder="Enter your password"
-            value={formData.password}
-            onChange={handleChange}
-            className="w-full border rounded-lg px-4 py-3"
-            required
-          />
+          <div className="relative">
+            <input
+              type={showPassword ? "text" : "password"}
+              name="password"
+              placeholder="Enter your password"
+              value={formData.password}
+              onChange={handleChange}
+              className="w-full border rounded-lg px-4 py-3 pr-12 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
+            />
+
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute inset-y-0 right-3 flex items-center text-gray-600 hover:text-black"
+            >
+              {showPassword ? <EyeOff size={22} /> : <Eye size={22} />}
+            </button>
+          </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700"
+            className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition"
           >
             {loading ? "Logging in..." : "Login"}
           </button>
         </form>
 
         {message && (
-          <p className="mt-4 text-center text-sm text-gray-700">{message}</p>
+          <p className="mt-4 text-center text-sm text-red-500">{message}</p>
         )}
       </div>
     </div>
