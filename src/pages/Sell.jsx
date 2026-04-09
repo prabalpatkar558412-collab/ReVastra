@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+const apiBaseUrl =
+  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:5000/api";
+
 export default function Sell() {
   const navigate = useNavigate();
 
@@ -16,6 +19,9 @@ export default function Sell() {
 
   const [imagePreview, setImagePreview] = useState(null);
   const [imageName, setImageName] = useState("");
+  const [imageFile, setImageFile] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   const handleChange = (e) => {
     setFormData((prev) => ({
@@ -28,21 +34,61 @@ export default function Sell() {
     const file = e.target.files[0];
 
     if (file) {
+      setErrorMessage("");
+      setImageFile(file);
       setImageName(file.name);
       setImagePreview(URL.createObjectURL(file));
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    navigate("/estimate", {
-      state: {
-        ...formData,
-        imagePreview,
-        imageName,
-      },
-    });
+    if (!imageFile) {
+      setErrorMessage("Please upload a clear image of the electronic device.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setErrorMessage("");
+
+    const payload = new FormData();
+    payload.append("deviceType", formData.deviceType);
+    payload.append("brand", formData.brand);
+    payload.append("model", formData.model);
+    payload.append("age", formData.age);
+    payload.append("condition", formData.condition);
+    payload.append("working", formData.working);
+    payload.append("description", formData.description);
+
+    if (imageFile) {
+      payload.append("image", imageFile);
+    }
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/submissions`, {
+        method: "POST",
+        body: payload,
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || "Failed to create submission");
+      }
+
+      navigate("/estimate", {
+        state: {
+          ...result.data,
+          localImagePreview: imagePreview,
+          imageName,
+        },
+      });
+    } catch (error) {
+      setErrorMessage(error.message || "Something went wrong");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -66,6 +112,12 @@ export default function Sell() {
             onSubmit={handleSubmit}
             className="grid grid-cols-1 md:grid-cols-2 gap-6"
           >
+            {errorMessage ? (
+              <div className="md:col-span-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {errorMessage}
+              </div>
+            ) : null}
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Device Type
@@ -117,17 +169,23 @@ export default function Sell() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Age of Device
+                Age of Device (Years)
               </label>
               <input
                 type="number"
                 name="age"
                 value={formData.age}
                 onChange={handleChange}
-                placeholder="In years"
+                placeholder="e.g. 2 years"
+                min="0"
+                step="0.1"
                 className="w-full border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-green-500"
                 required
               />
+              <p className="mt-2 text-xs text-gray-500">
+                Enter the age in years. Example: `0.5` for 6 months, `2` for 2
+                years.
+              </p>
             </div>
 
             <div>
@@ -177,12 +235,12 @@ export default function Sell() {
                   Upload device image
                 </span>
                 <span className="text-sm text-gray-400">
-                  JPG, PNG or JPEG
+                  PNG, JPG, JPEG, WEBP, HEIC or HEIF
                 </span>
 
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/png,image/jpeg,image/webp,image/heic,image/heif"
                   onChange={handleImageChange}
                   className="hidden"
                 />
@@ -222,9 +280,10 @@ export default function Sell() {
             <div className="md:col-span-2 flex flex-col sm:flex-row gap-4">
               <button
                 type="submit"
+                disabled={isSubmitting}
                 className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white font-semibold px-8 py-3 rounded-xl transition"
               >
-                Get Estimated Value
+                {isSubmitting ? "Submitting..." : "Get Estimated Value"}
               </button>
 
               <button
@@ -238,8 +297,13 @@ export default function Sell() {
                     condition: "",
                     working: "",
                     description: "",
-                  }) || setImagePreview(null) || setImageName("")
+                  }) ||
+                  setImagePreview(null) ||
+                  setImageName("") ||
+                  setImageFile(null) ||
+                  setErrorMessage("")
                 }
+                disabled={isSubmitting}
                 className="w-full sm:w-auto border border-gray-300 hover:bg-gray-100 text-gray-700 font-semibold px-8 py-3 rounded-xl transition"
               >
                 Reset Form
