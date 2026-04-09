@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 
-const apiBaseUrl =
-  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:5000/api";
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:5000/api";
 
 export default function Recyclers() {
   const location = useLocation();
@@ -12,67 +11,32 @@ export default function Recyclers() {
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
-    let isMounted = true;
-
-    async function fetchRecommendations() {
-      if (!initialData?.submissionId) {
-        setIsLoading(false);
-        return;
-      }
-
+    let alive = true;
+    (async () => {
+      if (!initialData?.submissionId) { setIsLoading(false); return; }
       try {
         setIsLoading(true);
-        setErrorMessage("");
-
-        const response = await fetch(
-          `${apiBaseUrl}/recyclers/recommendations/${initialData.submissionId}`
-        );
-        const result = await response.json();
-
-        if (!response.ok || !result.success) {
-          throw new Error(
-            result.message || "Failed to fetch recycler recommendations"
-          );
-        }
-
-        if (isMounted) {
-          setRecommendationData(result.data);
-        }
-      } catch (error) {
-        if (isMounted) {
-          setErrorMessage(error.message || "Something went wrong");
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
-    }
-
-    fetchRecommendations();
-
-    return () => {
-      isMounted = false;
-    };
+        const res = await fetch(`${apiBaseUrl}/recyclers/recommendations/${initialData.submissionId}`);
+        const result = await res.json();
+        if (!res.ok || !result.success) throw new Error(result.message || "Failed to fetch");
+        if (alive) setRecommendationData(result.data);
+      } catch (e) { if (alive) setErrorMessage(e.message); }
+      finally { if (alive) setIsLoading(false); }
+    })();
+    return () => { alive = false; };
   }, [initialData?.submissionId]);
 
   const data = recommendationData?.submission || initialData;
-  const finalRecyclers = recommendationData?.recyclers || [];
+  const recyclers = recommendationData?.recyclers || [];
 
   if (!data) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
-        <div className="bg-white shadow-lg rounded-2xl p-8 text-center w-full max-w-md">
-          <h1 className="text-2xl font-bold text-gray-800 mb-4">
-            No Estimate Data Found
-          </h1>
-          <p className="text-gray-500 mb-6">
-            Please estimate your device first to view recycler recommendations.
-          </p>
-          <Link
-            to="/sell"
-            className="inline-block bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-3 rounded-lg transition"
-          >
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-950 to-gray-900 flex items-center justify-center px-4">
+        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-10 text-center max-w-md shadow-2xl">
+          <span className="text-5xl mb-4 block">{"\uD83C\uDFED"}</span>
+          <h1 className="text-2xl font-black text-white mb-3">No Estimate Data</h1>
+          <p className="text-gray-500 mb-6">Please estimate your device first.</p>
+          <Link to="/sell" className="inline-block bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold px-6 py-3 rounded-xl shadow-lg shadow-green-500/20">
             Go to Sell Page
           </Link>
         </div>
@@ -81,174 +45,112 @@ export default function Recyclers() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-10 px-4">
-      <div className="max-w-6xl mx-auto">
-        <div className="bg-white shadow-lg rounded-3xl p-8 mb-8">
-          <p className="text-green-600 font-semibold mb-2">
-            Recycler Recommendation Engine
-          </p>
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-3">
-            Available Recyclers
-          </h1>
-          <p className="text-gray-500 mb-6">
-            Compare offers, pickup availability, ratings, and choose the best
-            recycler for your device.
-          </p>
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-950 to-gray-900 py-10 px-4">
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-20 right-10 w-72 h-72 bg-green-500/8 rounded-full blur-3xl" />
+      </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="p-4 rounded-2xl bg-gray-50 border">
-              <p className="text-sm text-gray-500">Device</p>
-              <h2 className="text-lg font-semibold text-gray-800">
-                {data.deviceType}
-              </h2>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-gray-50 border">
-              <p className="text-sm text-gray-500">Base Value</p>
-              <h2 className="text-lg font-semibold text-green-600">
-                {"\u20B9"}
-                {data.estimatedValue}
-              </h2>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-gray-50 border">
-              <p className="text-sm text-gray-500">Suggested Path</p>
-              <h2 className="text-lg font-semibold text-gray-800">
-                {data.suggestion}
-              </h2>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-gray-50 border">
-              <p className="text-sm text-gray-500">Sustainability Score</p>
-              <h2 className="text-lg font-semibold text-gray-800">
-                {data.sustainabilityScore}%
-              </h2>
-            </div>
+      <div className="relative max-w-6xl mx-auto">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center gap-2 bg-green-500/10 border border-green-500/20 rounded-full px-4 py-1.5 mb-4">
+            <span className="text-green-400 text-xs font-semibold">{"\uD83C\uDFED"} Recycler Recommendations</span>
           </div>
+          <h1 className="text-4xl font-black text-white mb-2">
+            Choose Your <span className="bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">Recycler</span>
+          </h1>
+          <p className="text-gray-500 text-sm">Compare offers, ratings, and pickup availability</p>
         </div>
 
-        {errorMessage ? (
-          <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
-            {errorMessage}
-          </div>
-        ) : null}
+        {/* Device Summary */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+          {[
+            { label: "Device", value: data.deviceType, icon: "\uD83D\uDCF1" },
+            { label: "Base Value", value: `\u20B9${data.estimatedValue?.toLocaleString("en-IN")}`, icon: "\uD83D\uDCB0" },
+            { label: "Suggestion", value: data.suggestion, icon: "\uD83D\uDCA1" },
+            { label: "Score", value: `${data.sustainabilityScore}%`, icon: "\uD83C\uDF0D" },
+          ].map(c => (
+            <div key={c.label} className="bg-white/5 border border-white/10 rounded-2xl p-4 backdrop-blur-sm">
+              <p className="text-xs text-gray-500">{c.icon} {c.label}</p>
+              <p className="text-white font-bold mt-1">{c.value}</p>
+            </div>
+          ))}
+        </div>
 
-        {isLoading ? (
-          <div className="bg-white shadow-md rounded-3xl p-8 text-center text-gray-600">
-            Loading recycler recommendations...
-          </div>
-        ) : null}
+        {/* Error */}
+        {errorMessage && (
+          <div className="mb-6 rounded-xl bg-red-500/10 border border-red-500/20 px-4 py-3 text-sm text-red-400">{"\u26A0\uFE0F"} {errorMessage}</div>
+        )}
 
-        {!isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {finalRecyclers.map((recycler) => (
-              <div
-                key={recycler.id}
-                className="bg-white shadow-md rounded-3xl p-6 border hover:shadow-lg transition relative"
-              >
-                {recycler.isBestMatch ? (
-                  <div className="absolute -top-3 left-6 bg-green-600 text-white text-sm font-semibold px-4 py-1 rounded-full shadow">
+        {/* Loading */}
+        {isLoading && (
+          <div className="bg-white/5 border border-white/10 rounded-3xl p-12 text-center">
+            <div className="w-10 h-10 border-4 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-gray-400">Finding best recyclers for you...</p>
+          </div>
+        )}
+
+        {/* Recycler Cards */}
+        {!isLoading && (
+          <div className="grid md:grid-cols-2 gap-6">
+            {recyclers.map((r, i) => (
+              <div key={r.id} className={`relative bg-white/5 backdrop-blur-xl border rounded-3xl p-6 transition-all hover:-translate-y-1 hover:shadow-2xl ${r.isBestMatch ? "border-green-500/40 shadow-lg shadow-green-500/10" : "border-white/10"}`}>
+                {r.isBestMatch && (
+                  <div className="absolute -top-3 left-6 bg-gradient-to-r from-green-500 to-emerald-500 text-white text-xs font-bold px-4 py-1 rounded-full shadow-lg shadow-green-500/30">
                     {"\u2B50"} Best Match
                   </div>
-                ) : null}
+                )}
 
-                <div className="flex items-start justify-between mb-5 mt-2">
+                <div className="flex items-start justify-between mb-4 mt-1">
                   <div>
-                    <h2 className="text-xl font-bold text-gray-800">
-                      {recycler.name}
-                    </h2>
-                    <p className="text-gray-500">{recycler.location}</p>
+                    <h2 className="text-xl font-bold text-white">{r.name}</h2>
+                    <p className="text-gray-500 text-sm">{"\uD83D\uDCCD"} {r.location}</p>
                   </div>
-
-                  <span className="bg-green-100 text-green-700 text-sm font-semibold px-3 py-1 rounded-full">
-                    {"\u2B50"} {recycler.rating}
-                  </span>
+                  <div className="bg-green-500/10 border border-green-500/20 rounded-xl px-3 py-1.5">
+                    <span className="text-green-400 font-bold text-sm">{"\u2B50"} {r.rating}</span>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 mb-5">
-                  <div className="p-3 rounded-xl bg-gray-50 border">
-                    <p className="text-sm text-gray-500">Distance</p>
-                    <p className="font-semibold text-gray-800">
-                      {recycler.distance}
-                    </p>
-                  </div>
-
-                  <div className="p-3 rounded-xl bg-gray-50 border">
-                    <p className="text-sm text-gray-500">Pickup</p>
-                    <p className="font-semibold text-gray-800">
-                      {recycler.pickup ? "Available" : "Not Available"}
-                    </p>
-                  </div>
-
-                  <div className="p-3 rounded-xl bg-gray-50 border">
-                    <p className="text-sm text-gray-500">Bonus Offer</p>
-                    <p className="font-semibold text-blue-600">
-                      {"\u20B9"}
-                      {recycler.offerBonus}
-                    </p>
-                  </div>
-
-                  <div className="p-3 rounded-xl bg-gray-50 border">
-                    <p className="text-sm text-gray-500">Final Offer</p>
-                    <p className="font-semibold text-green-600">
-                      {"\u20B9"}
-                      {recycler.finalOffer}
-                    </p>
-                  </div>
+                  {[
+                    { label: "Distance", value: r.distance, icon: "\uD83D\uDCCD", color: "gray" },
+                    { label: "Pickup", value: r.pickup ? "\u2705 Available" : "\u274C Not Available", icon: "\uD83D\uDE9A", color: r.pickup ? "green" : "red" },
+                    { label: "Bonus", value: `\u20B9${r.offerBonus}`, icon: "\uD83C\uDF81", color: "blue" },
+                    { label: "Final Offer", value: `\u20B9${r.finalOffer?.toLocaleString("en-IN")}`, icon: "\uD83D\uDCB0", color: "green" },
+                  ].map(c => (
+                    <div key={c.label} className={`p-3 rounded-xl bg-${c.color}-500/10 border border-${c.color}-500/15`}>
+                      <p className="text-xs text-gray-500">{c.icon} {c.label}</p>
+                      <p className={`font-bold text-sm text-${c.color === "gray" ? "white" : c.color + "-400"}`}>{c.value}</p>
+                    </div>
+                  ))}
                 </div>
 
-                <div className="mb-5 p-4 rounded-2xl bg-yellow-50 border border-yellow-200">
-                  <h3 className="font-bold text-gray-800 mb-2">
-                    Why choose this recycler?
-                  </h3>
-                  <ul className="text-sm text-gray-700 space-y-1">
-                    <li>{"\u2022"} Strong rating and trusted recycling partner</li>
-                    <li>
-                      {"\u2022"}{" "}
-                      {recycler.pickup
-                        ? "Pickup available for convenience"
-                        : "Manual drop-off required"}
-                    </li>
-                    <li>
-                      {"\u2022"} Better value alignment with your device estimate
-                    </li>
+                <div className="mb-5 p-3 rounded-xl bg-white/5 border border-white/5">
+                  <p className="text-xs font-semibold text-gray-400 mb-2">Why this recycler?</p>
+                  <ul className="text-xs text-gray-500 space-y-1">
+                    <li>{"\u2713"} Trusted recycling partner with strong rating</li>
+                    <li>{"\u2713"} {r.pickup ? "Doorstep pickup available" : "Drop-off at facility"}</li>
+                    <li>{"\u2713"} Competitive offer aligned with market rates</li>
                   </ul>
                 </div>
 
-                <Link
-                  to="/pickup"
-                  state={{
-                    ...data,
-                    recyclerId: recycler.id,
-                    recyclerName: recycler.name,
-                    finalOffer: recycler.finalOffer,
-                    pickup: recycler.pickup,
-                    recyclerLocation: recycler.location,
-                    recyclerRating: recycler.rating,
-                    recyclerScore: recycler.score,
-                  }}
-                  className="block text-center bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-xl transition"
-                >
-                  Select Recycler
+                <Link to="/pickup"
+                  state={{ ...data, recyclerId: r.id, recyclerName: r.name, finalOffer: r.finalOffer, pickup: r.pickup, recyclerLocation: r.location, recyclerRating: r.rating, recyclerScore: r.score }}
+                  className="block text-center bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-400 hover:to-emerald-400 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-green-500/20 hover:-translate-y-0.5">
+                  Select {r.name.split(" ")[0]} {"\u2192"}
                 </Link>
               </div>
             ))}
           </div>
-        ) : null}
+        )}
 
-        {!isLoading && !errorMessage && finalRecyclers.length === 0 ? (
-          <div className="bg-white shadow-md rounded-3xl p-8 text-center text-gray-600">
-            No recycler recommendations are available right now.
-          </div>
-        ) : null}
+        {!isLoading && !errorMessage && recyclers.length === 0 && (
+          <div className="bg-white/5 border border-white/10 rounded-3xl p-8 text-center text-gray-500">No recommendations available</div>
+        )}
 
         <div className="mt-8">
-          <Link
-            to="/estimate"
-            state={data}
-            className="inline-block px-6 py-3 rounded-xl border border-gray-300 font-semibold text-gray-700 hover:bg-gray-100 transition"
-          >
-            Back to Estimate
+          <Link to="/estimate" state={data} className="bg-white/5 hover:bg-white/10 border border-white/10 text-gray-400 font-semibold px-6 py-3 rounded-xl transition">
+            {"\u2190"} Back to Estimate
           </Link>
         </div>
       </div>

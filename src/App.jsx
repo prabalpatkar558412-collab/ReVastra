@@ -23,10 +23,10 @@ function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/login" element={<Login />} />
-            <Route path="/sell" element={<Sell />} />
-            <Route path="/estimate" element={<Estimate />} />
-            <Route path="/recyclers" element={<Recyclers />} />
-            <Route path="/pickup" element={<Pickup />} />
+            <Route path="/sell" element={<ProtectedRoute role="user"><Sell /></ProtectedRoute>} />
+            <Route path="/estimate" element={<ProtectedRoute role="user"><Estimate /></ProtectedRoute>} />
+            <Route path="/recyclers" element={<ProtectedRoute role="user"><Recyclers /></ProtectedRoute>} />
+            <Route path="/pickup" element={<ProtectedRoute role="user"><Pickup /></ProtectedRoute>} />
             <Route
               path="/dashboard"
               element={
