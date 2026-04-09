@@ -6,12 +6,14 @@ import Footer from "./components/Footer";
 import Home from "./pages/Home";
 import Categories from "./pages/Categories";
 import Sell from "./pages/Sell";
+import Estimate from "./pages/EstimationResult";
+import Recyclers from "./pages/Recyclers";
+import Pickup from "./pages/Pickup";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import AdminDashboard from "./pages/AdminDashboard";
 import RecyclerDashboard from "./pages/RecyclerDashboard";
-import Recyclers from "./pages/Recyclers";
 
 function App() {
   const location = useLocation();
@@ -30,10 +32,12 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/categories" element={<Categories />} />
           <Route path="/sell" element={<Sell />} />
+          <Route path="/estimate" element={<Estimate />} />
           <Route path="/recyclers" element={<Recyclers />} />
+          <Route path="/pickup" element={<Pickup />} />
           <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/dashboard/recycler" element={<RecyclerDashboard />} />
+          <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
         </Routes>
