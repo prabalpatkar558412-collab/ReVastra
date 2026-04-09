@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { calculateDeviceEstimate } from "../utils/pricing";
 
 export default function Estimate() {
   const location = useLocation();
@@ -53,39 +54,8 @@ export default function Estimate() {
     );
   }
 
-  const age = Number(data.age || 0);
-
-  let basePrice = 0;
-  if (data.deviceType === "Phone") basePrice = 15000;
-  else if (data.deviceType === "Laptop") basePrice = 25000;
-  else if (data.deviceType === "Tablet") basePrice = 12000;
-  else if (data.deviceType === "Headphones") basePrice = 4000;
-  else basePrice = 3000;
-
-  let conditionDeduction = 0;
-  if (data.condition === "Excellent") conditionDeduction = 500;
-  else if (data.condition === "Good") conditionDeduction = 1000;
-  else if (data.condition === "Damaged") conditionDeduction = 3000;
-  else if (data.condition === "Dead") conditionDeduction = 5000;
-
-  let workingDeduction = 0;
-  if (data.working === "Partially") workingDeduction = 1500;
-  else if (data.working === "No") workingDeduction = 3000;
-
-  const ageDeduction = age * 1000;
-
-  const estimatedValue = Math.max(
-    basePrice - ageDeduction - conditionDeduction - workingDeduction,
-    500
-  );
-
-  const suggestion =
-    data.condition === "Dead" || data.working === "No"
-      ? "Best suited for recycling"
-      : "Resale or recycle both possible";
-
-  const impactScore =
-    data.condition === "Dead" ? 90 : data.condition === "Damaged" ? 78 : 65;
+  const { estimatedValue, suggestion, impactScore, breakdown } =
+    calculateDeviceEstimate(data);
 
   return (
     <div className="min-h-screen bg-gray-50 py-10 px-4">
@@ -143,6 +113,17 @@ export default function Estimate() {
               </h2>
             </div>
 
+            <div className="p-4 rounded-xl bg-slate-50 border">
+              <p className="text-sm text-gray-500 mb-2">Pricing Breakdown</p>
+              <div className="space-y-1 text-sm text-gray-700">
+                <p>Base Price: ₹{breakdown.basePrice}</p>
+                <p>Brand Factor: {breakdown.brandMultiplier}x</p>
+                <p>Condition Factor: {breakdown.conditionMultiplier}x</p>
+                <p>Working Factor: {breakdown.workingMultiplier}x</p>
+                <p>Age Factor: {breakdown.ageMultiplier.toFixed(2)}x</p>
+              </div>
+            </div>
+
             <div className="p-4 rounded-xl bg-blue-50 border border-blue-200">
               <p className="text-sm text-gray-500">Suggested Path</p>
               <h2 className="text-lg font-semibold text-gray-800">
@@ -192,7 +173,8 @@ export default function Estimate() {
                   🌿 CO₂ Saved: {data.deviceType === "Laptop" ? "450g" : "180g"}
                 </div>
                 <div className="p-4 rounded-xl bg-yellow-50 border border-yellow-100">
-                  🔋 E-waste diverted: {data.deviceType === "Laptop" ? "1.2kg" : "0.4kg"}
+                  🔋 E-waste diverted:{" "}
+                  {data.deviceType === "Laptop" ? "1.2kg" : "0.4kg"}
                 </div>
               </div>
             </div>
