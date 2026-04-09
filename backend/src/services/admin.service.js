@@ -224,6 +224,25 @@ async function getAdminRequestsSummary(filters = {}) {
     requests: filteredRequests,
     submissions: filteredSubmissions,
     availableRecyclers,
+    users: userSnapshot.docs.map((doc) => {
+      const u = doc.data();
+      return {
+        userId: u.userId,
+        name: u.name,
+        email: u.email,
+        role: u.role,
+        phone: u.phone || "",
+        address: u.address || "",
+        organizationName: u.organizationName || "",
+        serviceArea: u.serviceArea || "",
+        createdAt: u.createdAt,
+        totalEarnings: u.totalEarnings || 0,
+        devicesRecycled: u.devicesRecycled || 0,
+        ewasteSavedKg: u.ewasteSavedKg || 0,
+        rewardPoints: u.rewardPoints || 0,
+        pickupCount: u.pickupCount || 0,
+      };
+    }),
     filters: {
       q: filters.q || "",
       status: filters.status || "",
