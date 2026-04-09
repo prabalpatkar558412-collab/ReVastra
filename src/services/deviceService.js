@@ -5,7 +5,7 @@ import {
   query,
   orderBy,
 } from "firebase/firestore";
-import { db } from "../firebase/Firebase";
+import { db } from "../Firebase";
 
 export async function saveDevice(data) {
   const docRef = await addDoc(collection(db, "devices"), data);
