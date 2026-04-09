@@ -8,11 +8,81 @@ function formatStatus(status) {
     .replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
+function formatCurrency(value) {
+  return `\u20B9${Number(value || 0).toLocaleString("en-IN")}`;
+}
+
+function formatDate(dateValue) {
+  if (!dateValue) {
+    return "Not available";
+  }
+
+  const date = new Date(dateValue);
+
+  if (Number.isNaN(date.getTime())) {
+    return dateValue;
+  }
+
+  return date.toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function formatDateTime(dateValue) {
+  if (!dateValue) {
+    return "Not available";
+  }
+
+  const date = new Date(dateValue);
+
+  if (Number.isNaN(date.getTime())) {
+    return dateValue;
+  }
+
+  return date.toLocaleString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function getStatusStyle(status) {
+  if (status === "completed") {
+    return "bg-green-100 text-green-800";
+  }
+  if (status === "assigned") {
+    return "bg-blue-100 text-blue-800";
+  }
+  if (status === "pickup_requested" || status === "pending") {
+    return "bg-yellow-100 text-yellow-800";
+  }
+  if (status === "estimated") {
+    return "bg-purple-100 text-purple-800";
+  }
+  return "bg-gray-100 text-gray-700";
+}
+
+function getActivityBadgeStyle(type) {
+  if (type === "pickup_created" || type === "pickup_status_updated") {
+    return "bg-blue-100 text-blue-700";
+  }
+  if (type === "estimate_generated") {
+    return "bg-purple-100 text-purple-700";
+  }
+  return "bg-green-100 text-green-700";
+}
+
 export default function Dashboard() {
   const location = useLocation();
   const { authFetch, syncUser, user } = useAuth();
   const latestPickup = location.state?.pickupRequest;
   const [dashboardData, setDashboardData] = useState(null);
+  const [expandedPickupId, setExpandedPickupId] = useState("");
+  const [expandedSubmissionId, setExpandedSubmissionId] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -70,6 +140,9 @@ export default function Dashboard() {
   const pickups = dashboardData?.pickups || [];
   const recentActivity = dashboardData?.recentActivity || [];
 
+  const latestSubmission = submissions[0] || null;
+  const latestPickupStatus = pickups[0] || null;
+
   return (
     <div className="min-h-screen bg-gray-50 py-10 px-4">
       <div className="max-w-6xl mx-auto">
@@ -117,8 +190,7 @@ export default function Dashboard() {
               <div className="bg-blue-100 p-6 rounded-2xl">
                 <p>Total Earnings</p>
                 <h2 className="text-2xl font-bold">
-                  {"\u20B9"}
-                  {stats.totalEarnings}
+                  {formatCurrency(stats.totalEarnings)}
                 </h2>
               </div>
 
@@ -135,36 +207,148 @@ export default function Dashboard() {
 
             <div className="grid lg:grid-cols-2 gap-6 mb-8">
               <div className="bg-white p-6 rounded-2xl shadow">
+                <p className="text-sm font-semibold text-green-600 mb-2">
+                  Latest Pickup
+                </p>
+                {latestPickupStatus ? (
+                  <>
+                    <div className="flex items-center justify-between gap-4 mb-3">
+                      <h2 className="text-xl font-bold text-gray-800">
+                        {latestPickupStatus.recyclerName}
+                      </h2>
+                      <span
+                        className={`rounded-full px-3 py-1 text-sm font-semibold ${getStatusStyle(
+                          latestPickupStatus.status
+                        )}`}
+                      >
+                        {formatStatus(latestPickupStatus.status)}
+                      </span>
+                    </div>
+                    <p className="text-gray-600 mb-2">
+                      Pickup scheduled for {formatDate(latestPickupStatus.pickupDate)}
+                    </p>
+                    <p className="font-semibold text-green-600">
+                      Final Offer: {formatCurrency(latestPickupStatus.finalOffer)}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-gray-600">
+                    No pickup scheduled yet. Choose a recycler to continue.
+                  </p>
+                )}
+              </div>
+
+              <div className="bg-white p-6 rounded-2xl shadow">
+                <p className="text-sm font-semibold text-green-600 mb-2">
+                  Latest Submission
+                </p>
+                {latestSubmission ? (
+                  <>
+                    <div className="flex items-center justify-between gap-4 mb-3">
+                      <h2 className="text-xl font-bold text-gray-800">
+                        {latestSubmission.brand} {latestSubmission.model}
+                      </h2>
+                      <span
+                        className={`rounded-full px-3 py-1 text-sm font-semibold ${getStatusStyle(
+                          latestSubmission.status
+                        )}`}
+                      >
+                        {formatStatus(latestSubmission.status)}
+                      </span>
+                    </div>
+                    <p className="text-gray-600 mb-2">{latestSubmission.deviceType}</p>
+                    <p className="font-semibold text-green-600">
+                      Estimate: {formatCurrency(latestSubmission.estimatedValue)}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-gray-600">
+                    Your latest device submission will appear here.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="grid lg:grid-cols-2 gap-6 mb-8">
+              <div className="bg-white p-6 rounded-2xl shadow">
                 <h2 className="text-xl font-bold mb-4">
-                  Pickup Tracking {"\uD83D\uDE9A"}
+                  Pickup History {"\uD83D\uDE9A"}
                 </h2>
 
                 <div className="space-y-4">
                   {pickups.length > 0 ? (
-                    pickups.slice(0, 4).map((pickup) => (
-                      <div
-                        key={pickup.pickupId}
-                        className="rounded-xl border bg-gray-50 p-4"
-                      >
-                        <div className="flex items-center justify-between gap-4">
-                          <div>
-                            <p className="font-semibold text-gray-800">
-                              {pickup.recyclerName}
-                            </p>
-                            <p className="text-sm text-gray-500">
-                              Pickup Date: {pickup.pickupDate}
-                            </p>
+                    pickups.map((pickup) => {
+                      const isExpanded = expandedPickupId === pickup.pickupId;
+
+                      return (
+                        <div
+                          key={pickup.pickupId}
+                          className="rounded-xl border bg-gray-50 p-4"
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div>
+                              <p className="font-semibold text-gray-800">
+                                {pickup.recyclerName}
+                              </p>
+                              <p className="text-sm text-gray-500">
+                                Pickup Date: {formatDate(pickup.pickupDate)}
+                              </p>
+                            </div>
+                            <span
+                              className={`rounded-full px-3 py-1 text-sm font-semibold ${getStatusStyle(
+                                pickup.status
+                              )}`}
+                            >
+                              {formatStatus(pickup.status)}
+                            </span>
                           </div>
-                          <span className="rounded-full bg-yellow-100 px-3 py-1 text-sm font-semibold text-yellow-800">
-                            {formatStatus(pickup.status)}
-                          </span>
+
+                          <div className="mt-3 flex items-center justify-between gap-4">
+                            <p className="text-sm font-semibold text-green-600">
+                              {formatCurrency(pickup.finalOffer)}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setExpandedPickupId((currentPickupId) =>
+                                  currentPickupId === pickup.pickupId
+                                    ? ""
+                                    : pickup.pickupId
+                                )
+                              }
+                              className="text-sm font-semibold text-gray-700 underline"
+                            >
+                              {isExpanded ? "Hide Details" : "View Details"}
+                            </button>
+                          </div>
+
+                          {isExpanded ? (
+                            <div className="mt-4 rounded-xl border bg-white p-4 text-sm text-gray-700 space-y-2">
+                              <p>
+                                <span className="font-semibold">Device:</span>{" "}
+                                {pickup.brand} {pickup.model}
+                              </p>
+                              <p>
+                                <span className="font-semibold">Contact:</span>{" "}
+                                {pickup.contact}
+                              </p>
+                              <p>
+                                <span className="font-semibold">Address:</span>{" "}
+                                {pickup.address}
+                              </p>
+                              <p>
+                                <span className="font-semibold">Request ID:</span>{" "}
+                                {pickup.pickupId}
+                              </p>
+                              <p>
+                                <span className="font-semibold">Last Updated:</span>{" "}
+                                {formatDateTime(pickup.updatedAt)}
+                              </p>
+                            </div>
+                          ) : null}
                         </div>
-                        <p className="mt-3 text-sm text-green-600 font-semibold">
-                          {"\u20B9"}
-                          {pickup.finalOffer}
-                        </p>
-                      </div>
-                    ))
+                      );
+                    })
                   ) : (
                     <p className="text-gray-600">
                       No pickup requests yet. Complete the recycler step to
@@ -175,34 +359,93 @@ export default function Dashboard() {
               </div>
 
               <div className="bg-white p-6 rounded-2xl shadow">
-                <h2 className="text-xl font-bold mb-4">Your Submissions</h2>
+                <h2 className="text-xl font-bold mb-4">Submission History</h2>
 
                 <div className="space-y-4">
                   {submissions.length > 0 ? (
-                    submissions.slice(0, 4).map((submission) => (
-                      <div
-                        key={submission.submissionId}
-                        className="rounded-xl border bg-gray-50 p-4"
-                      >
-                        <div className="flex items-center justify-between gap-4">
-                          <div>
-                            <p className="font-semibold text-gray-800">
-                              {submission.brand} {submission.model}
-                            </p>
-                            <p className="text-sm text-gray-500">
-                              {submission.deviceType}
-                            </p>
+                    submissions.map((submission) => {
+                      const isExpanded =
+                        expandedSubmissionId === submission.submissionId;
+
+                      return (
+                        <div
+                          key={submission.submissionId}
+                          className="rounded-xl border bg-gray-50 p-4"
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div>
+                              <p className="font-semibold text-gray-800">
+                                {submission.brand} {submission.model}
+                              </p>
+                              <p className="text-sm text-gray-500">
+                                {submission.deviceType}
+                              </p>
+                            </div>
+                            <span
+                              className={`rounded-full px-3 py-1 text-sm font-semibold ${getStatusStyle(
+                                submission.status
+                              )}`}
+                            >
+                              {formatStatus(submission.status)}
+                            </span>
                           </div>
-                          <span className="rounded-full bg-blue-100 px-3 py-1 text-sm font-semibold text-blue-800">
-                            {formatStatus(submission.status)}
-                          </span>
+
+                          <div className="mt-3 flex items-center justify-between gap-4">
+                            <p className="text-sm text-gray-600">
+                              Estimate: {formatCurrency(submission.estimatedValue)}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setExpandedSubmissionId((currentSubmissionId) =>
+                                  currentSubmissionId === submission.submissionId
+                                    ? ""
+                                    : submission.submissionId
+                                )
+                              }
+                              className="text-sm font-semibold text-gray-700 underline"
+                            >
+                              {isExpanded ? "Hide Details" : "View Details"}
+                            </button>
+                          </div>
+
+                          {isExpanded ? (
+                            <div className="mt-4 rounded-xl border bg-white p-4 text-sm text-gray-700 space-y-2">
+                              <p>
+                                <span className="font-semibold">Condition:</span>{" "}
+                                {submission.condition}
+                              </p>
+                              <p>
+                                <span className="font-semibold">Working:</span>{" "}
+                                {submission.working}
+                              </p>
+                              <p>
+                                <span className="font-semibold">Age:</span>{" "}
+                                {submission.age} year(s)
+                              </p>
+                              <p>
+                                <span className="font-semibold">Suggestion:</span>{" "}
+                                {submission.suggestion || "Not generated yet"}
+                              </p>
+                              <p>
+                                <span className="font-semibold">
+                                  Sustainability Score:
+                                </span>{" "}
+                                {submission.sustainabilityScore || 0}%
+                              </p>
+                              <p>
+                                <span className="font-semibold">Submission ID:</span>{" "}
+                                {submission.submissionId}
+                              </p>
+                              <p>
+                                <span className="font-semibold">Description:</span>{" "}
+                                {submission.description || "No description provided"}
+                              </p>
+                            </div>
+                          ) : null}
                         </div>
-                        <p className="mt-3 text-sm text-gray-600">
-                          Estimate: {"\u20B9"}
-                          {submission.estimatedValue || 0}
-                        </p>
-                      </div>
-                    ))
+                      );
+                    })
                   ) : (
                     <p className="text-gray-600">
                       No linked submissions found yet.
@@ -222,12 +465,28 @@ export default function Dashboard() {
                       key={activity.activityId || activity.id}
                       className="rounded-xl border bg-gray-50 p-4"
                     >
-                      <p className="font-semibold text-gray-800">
-                        {activity.title}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        {activity.description}
-                      </p>
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <div>
+                          <p className="font-semibold text-gray-800">
+                            {activity.title}
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            {activity.description}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-semibold ${getActivityBadgeStyle(
+                              activity.type
+                            )}`}
+                          >
+                            {formatStatus(activity.type || "activity")}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            {formatDateTime(activity.createdAt)}
+                          </span>
+                        </div>
+                      </div>
                     </li>
                   ))}
                 </ul>
