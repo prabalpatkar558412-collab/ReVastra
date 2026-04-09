@@ -1,5 +1,4 @@
-
- import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { saveDevice, uploadDeviceImage } from "../services/deviceService";
@@ -62,7 +61,7 @@ export default function Sell() {
 
     setFormData((prev) => ({
       ...prev,
-      [e.target.name]: value,
+      [name]: value,
     }));
   };
 
@@ -70,7 +69,11 @@ export default function Sell() {
     if (!value) return "";
     const v = String(value).toLowerCase();
 
-    if (v.includes("phone") || v.includes("smartphone") || v.includes("mobile")) {
+    if (
+      v.includes("phone") ||
+      v.includes("smartphone") ||
+      v.includes("mobile")
+    ) {
       return "Phone";
     }
     if (v.includes("laptop") || v.includes("notebook")) {
@@ -110,7 +113,11 @@ export default function Sell() {
     const v = String(conditionValue).toLowerCase();
 
     if (v.includes("excellent") || v.includes("good")) return "Yes";
-    if (v.includes("damaged") || v.includes("cracked") || v.includes("broken")) {
+    if (
+      v.includes("damaged") ||
+      v.includes("cracked") ||
+      v.includes("broken")
+    ) {
       return "Partially";
     }
     if (v.includes("dead")) return "No";
@@ -193,7 +200,9 @@ export default function Sell() {
 
       const nextDeviceType = normalizeDeviceType(parsed.deviceType);
       const nextBrand = parsed.likelyBrand || "";
-      const nextModel = parsed.exactModelReliable ? parsed.likelyModel || "" : "";
+      const nextModel = parsed.exactModelReliable
+        ? parsed.likelyModel || ""
+        : "";
       const nextCondition = normalizeCondition(parsed.visibleCondition);
       const nextWorking = normalizeWorking(parsed.visibleCondition);
 
@@ -265,17 +274,19 @@ export default function Sell() {
         imageURL = await uploadDeviceImage(imageFile, user.uid);
       }
 
-      const payload = {
-        ...formData,
-        uid: user.uid,
-        userEmail: user.email || "",
-        imageName,
-        imageURL,
-        aiSummary,
-        aiResult: aiResult || null,
-        status: "submitted",
-        createdAt: new Date().toISOString(),
-      };
+     const payload = {
+  ...formData,
+  uid: user.uid,
+  userId: user.uid,
+  userEmail: user.email || "",
+  imageName,
+  imageURL,
+  aiSummary,
+  aiResult: aiResult || null,
+  status: "submitted",
+  bookingStatus: "",
+  createdAt: new Date().toISOString(),
+};
 
       const firebaseId = await saveDevice(payload);
 

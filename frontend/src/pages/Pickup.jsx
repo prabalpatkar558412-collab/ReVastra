@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import { useLocation, Link, useNavigate } from "react-router-dom";
+import { doc, updateDoc } from "firebase/firestore";
 import Loader from "../components/Loader";
+import { db } from "../firebase";
 
 export default function Pickup() {
   const location = useLocation();
@@ -15,6 +17,8 @@ export default function Pickup() {
   })();
 
   const data = location.state || storedRecyclerData;
+
+  console.log("pickup data:", data);
 
   const today = useMemo(() => {
     const now = new Date();
@@ -68,33 +72,53 @@ export default function Pickup() {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!data.pickup) {
-      alert("This recycler does not support pickup. Please choose another recycler or arrange drop-off.");
+      alert(
+        "This recycler does not support pickup. Please choose another recycler or arrange drop-off."
+      );
       return;
     }
 
-    const bookingData = {
-      ...data,
-      customerName: formData.name,
-      customerAddress: formData.address,
-      customerContact: formData.contact,
-      pickupDate: formData.pickupDate,
-      notes: formData.notes,
-      bookingStatus: "Pickup Confirmed",
-      bookingId: `REV-${Date.now()}`,
-      bookedAt: new Date().toISOString(),
-    };
+    if (!data.firebaseId) {
+      alert("firebaseId missing. Please submit device again from Sell page.");
+      return;
+    }
 
-    localStorage.setItem("pickupBooking", JSON.stringify(bookingData));
+    try {
+      setLoading(true);
 
-    setLoading(true);
+      const bookingData = {
+        customerName: formData.name,
+        customerAddress: formData.address,
+        customerContact: formData.contact,
+        pickupDate: formData.pickupDate,
+        notes: formData.notes,
+        bookingStatus: "Pickup Confirmed",
+        status: "pickup_scheduled",
+        recyclerName: data.recyclerName || "",
+        finalOffer: data.finalOffer || 0,
+        pickup: data.pickup || false,
+        recyclerLocation: data.recyclerLocation || "",
+        recyclerRating: data.recyclerRating || "",
+        bookedAt: new Date().toISOString(),
+      };
 
-    setTimeout(() => {
-      navigate("/dashboard", { state: bookingData });
-    }, 1800);
+      await updateDoc(doc(db, "devices", data.firebaseId), bookingData);
+
+      localStorage.setItem(
+        "pickupBooking",
+        JSON.stringify({ ...data, ...bookingData })
+      );
+
+      navigate("/dashboard");
+    } catch (error) {
+      console.error("Failed to save pickup:", error);
+      alert("Failed to save pickup booking");
+      setLoading(false);
+    }
   };
 
   return (
@@ -193,7 +217,7 @@ export default function Pickup() {
 
           <textarea
             name="notes"
-            placeholder="Extra instructions (optional) - e.g. call before arrival, 2nd floor, gate code, fragile screen"
+            placeholder="Extra instructions (optional)"
             value={formData.notes}
             onChange={handleChange}
             className="border rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-green-500"

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { getAuth } from "firebase/auth";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { getDevicesByUser } from "../services/deviceService";
 
 export default function Dashboard() {
@@ -9,31 +9,38 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const loadDevices = async () => {
-      try {
-        const auth = getAuth();
-        const currentUser = auth.currentUser;
+    const auth = getAuth();
 
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      try {
         if (!currentUser) {
           navigate("/login");
           return;
         }
 
+        console.log("Dashboard current uid:", currentUser.uid);
+
         const data = await getDevicesByUser(currentUser.uid);
+        console.log("Devices from Firebase:", data);
+
         setDevices(data);
       } catch (error) {
         console.error("Failed to fetch devices:", error);
       } finally {
         setLoading(false);
       }
-    };
+    });
 
-    loadDevices();
+    return () => unsubscribe();
   }, [navigate]);
 
   const totalDevices = devices.length;
 
   const totalEarnings = devices.reduce((sum, device) => {
+    if (device.finalOffer) {
+      return sum + Number(device.finalOffer || 0);
+    }
+
     const age = Number(device.age || 0);
 
     let basePrice = 0;
@@ -72,7 +79,14 @@ export default function Dashboard() {
     }, 0)
     .toFixed(1);
 
-  const completedPickups = Math.floor(totalDevices / 2);
+  const completedPickups = devices.filter((device) =>
+    ["pickup_scheduled", "picked", "completed"].includes(device.status)
+  ).length;
+
+  const formatStatus = (status) => {
+    if (!status) return "submitted";
+    return String(status).replaceAll("_", " ");
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 py-10 px-4">
@@ -125,27 +139,50 @@ export default function Dashboard() {
               {devices.map((device) => (
                 <div
                   key={device.id}
-                  className="p-4 border rounded-xl flex flex-col md:flex-row md:items-center md:justify-between gap-4"
+                  className="p-4 border rounded-xl flex flex-col md:flex-row md:items-start md:justify-between gap-4"
                 >
-                  <div>
-                    <h3 className="font-semibold text-gray-800">
-                      {device.brand} {device.model}
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-gray-800 text-lg">
+                      {device.brand || "Unknown Brand"} {device.model || ""}
                     </h3>
-                    <p className="text-sm text-gray-500">
-                      {device.deviceType} • {device.condition} • {device.working}
+
+                    <p className="text-sm text-gray-500 mt-1">
+                      {device.deviceType || "Unknown Device"} •{" "}
+                      {device.condition || "Unknown Condition"} •{" "}
+                      {device.working || "Unknown Working Status"}
                     </p>
+
                     <p className="text-sm text-gray-500">
-                      Age: {device.age} year(s)
+                      Age: {device.age || 0} year(s)
                     </p>
-                    {device.createdAt && (
-                      <p className="text-xs text-gray-400 mt-1">
-                        Submitted: {String(device.createdAt)}
+
+                    {device.pickupDate && (
+                      <p className="text-sm text-gray-600 mt-1">
+                        Pickup Date: {device.pickupDate}
+                      </p>
+                    )}
+
+                    {device.recyclerName && (
+                      <p className="text-sm text-gray-600">
+                        Recycler: {device.recyclerName}
+                      </p>
+                    )}
+
+                    {device.finalOffer && (
+                      <p className="text-sm text-green-600 font-semibold mt-2">
+                        Final Offer: ₹{device.finalOffer}
+                      </p>
+                    )}
+
+                    {device.bookingStatus && (
+                      <p className="text-sm text-green-600 font-medium mt-2">
+                        {device.bookingStatus}
                       </p>
                     )}
                   </div>
 
-                  <div className="text-sm text-gray-600">
-                    {device.status || "submitted"}
+                  <div className="text-sm text-gray-600 capitalize">
+                    {formatStatus(device.status)}
                   </div>
                 </div>
               ))}
