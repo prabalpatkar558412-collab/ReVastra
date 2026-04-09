@@ -99,6 +99,7 @@ export default function Dashboard() {
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [liveTracking, setLiveTracking] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -168,6 +169,59 @@ export default function Dashboard() {
     },
     [dashboardData?.nearbyRecyclers, selectedRecyclerId]
   );
+
+  useEffect(() => {
+    if (!pickupStatus) {
+      setLiveTracking(null);
+      return;
+    }
+
+    const isCompleted = pickupStatus.stages?.find(
+      (stage) => stage.key === "completed"
+    )?.completed;
+
+    if (isCompleted) {
+      setLiveTracking(null);
+      return;
+    }
+
+    const totalDistance = 3.5 + Math.random() * 4;
+    const totalEta = Math.ceil(totalDistance * 4.5);
+    const landmarks = [
+      "Agent departing from depot",
+      "Crossing main highway",
+      "Near market area",
+      "Entering your locality",
+      "On your street",
+      "Arriving at your location",
+    ];
+
+    let tick = 0;
+    const maxTicks = 20;
+
+    function updateTracking() {
+      tick = Math.min(tick + 1, maxTicks);
+      const progress = tick / maxTicks;
+      const remaining = Math.max(0.1, totalDistance * (1 - progress));
+      const eta = Math.max(1, Math.ceil(totalEta * (1 - progress)));
+      const landmarkIdx = Math.min(
+        Math.floor(progress * landmarks.length),
+        landmarks.length - 1
+      );
+
+      setLiveTracking({
+        distance: Number(remaining.toFixed(1)),
+        eta,
+        locationText: landmarks[landmarkIdx],
+        progress: Math.round(progress * 100),
+      });
+    }
+
+    updateTracking();
+    const interval = setInterval(updateTracking, 4000);
+
+    return () => clearInterval(interval);
+  }, [pickupStatus]);
 
   const handleProfileChange = (event) => {
     const { name, value } = event.target;
@@ -459,6 +513,55 @@ export default function Dashboard() {
                         Pickup date: {formatDate(pickupStatus.pickupDate)}
                       </p>
                     </div>
+
+                    {liveTracking ? (
+                      <div className="mt-5 rounded-2xl border-2 border-green-200 bg-gradient-to-br from-green-50 to-blue-50 p-4">
+                        <div className="flex items-center gap-2 mb-4">
+                          <span className="relative flex h-3 w-3">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                          </span>
+                          <p className="font-bold text-green-700 text-sm uppercase tracking-wide">
+                            Live Tracking
+                          </p>
+                        </div>
+
+                        <div className="mb-4">
+                          <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+                            <span>Agent</span>
+                            <span>Your Location</span>
+                          </div>
+                          <div className="h-2.5 rounded-full bg-gray-200 overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-gradient-to-r from-green-400 to-green-600 transition-all duration-1000 ease-out"
+                              style={{ width: `${liveTracking.progress}%` }}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3 mb-3">
+                          <div className="rounded-xl border bg-white p-3">
+                            <p className="text-xs text-gray-500">Distance Away</p>
+                            <p className="text-lg font-bold text-gray-800">
+                              {liveTracking.distance} km
+                            </p>
+                          </div>
+                          <div className="rounded-xl border bg-white p-3">
+                            <p className="text-xs text-gray-500">ETA</p>
+                            <p className="text-lg font-bold text-gray-800">
+                              {liveTracking.eta} min
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl border bg-white p-3">
+                          <p className="text-xs text-gray-500">Current Location</p>
+                          <p className="font-semibold text-gray-800">
+                            {"\uD83D\uDCCD"} {liveTracking.locationText}
+                          </p>
+                        </div>
+                      </div>
+                    ) : null}
                   </>
                 ) : (
                   <p className="text-gray-600">

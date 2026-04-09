@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 const apiBaseUrl =
@@ -7,7 +7,11 @@ const apiBaseUrl =
 
 export default function Sell() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { authFetch, isAuthenticated } = useAuth();
+
+  const fileInputRef = useRef(null);
+  const entryMode = location.state?.entryMode;
 
   const [formData, setFormData] = useState({
     deviceType: "",
@@ -24,6 +28,15 @@ export default function Sell() {
   const [imageFile, setImageFile] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+
+  useEffect(() => {
+    if (entryMode === "camera" && fileInputRef.current) {
+      const timer = setTimeout(() => {
+        fileInputRef.current.click();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [entryMode]);
 
   const handleChange = (e) => {
     setFormData((prev) => ({
@@ -244,6 +257,7 @@ export default function Sell() {
                 </span>
 
                 <input
+                  ref={fileInputRef}
                   type="file"
                   accept="image/png,image/jpeg,image/webp,image/heic,image/heif"
                   capture="environment"
