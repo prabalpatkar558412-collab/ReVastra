@@ -52,12 +52,6 @@ export default function Login() {
         role = userSnap.data().role || "user";
       }
 
-      setMessage("Login successful");
-      setFormData({
-        email: "",
-        password: "",
-      });
-
       if (role === "admin") {
         navigate("/admin");
         return;
@@ -73,7 +67,6 @@ export default function Login() {
         return;
       }
 
-      // normal user ke liye device check
       const deviceQuery = query(
         collection(db, "devices"),
         where("uid", "==", uid),
