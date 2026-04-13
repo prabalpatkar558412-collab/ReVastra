@@ -34,10 +34,21 @@ function buildRecyclerStats(requests) {
 }
 
 async function getRecyclerDashboardSummary(currentUser) {
-  const pickupSnapshot = await db
-    .collection("pickupRequests")
-    .where("recyclerId", "==", currentUser.managedRecyclerId)
-    .get();
+  let pickupSnapshot;
+
+  if (currentUser.managedRecyclerId) {
+    pickupSnapshot = await db
+      .collection("pickupRequests")
+      .where("recyclerId", "==", currentUser.managedRecyclerId)
+      .get();
+  } else if (currentUser.email) {
+    pickupSnapshot = await db
+      .collection("pickupRequests")
+      .where("recyclerOpsEmail", "==", currentUser.email)
+      .get();
+  } else {
+    pickupSnapshot = { docs: [] };
+  }
 
   const requests = sortByNewest(
     pickupSnapshot.docs.map((document) => document.data())
@@ -58,6 +69,13 @@ async function getRecyclerDashboardSummary(currentUser) {
   }, {});
 
   return {
+    onboarding: {
+      hasManagedRecycler: Boolean(currentUser.managedRecyclerId),
+      managedRecyclerId: currentUser.managedRecyclerId || "",
+      note: currentUser.managedRecyclerId
+        ? ""
+        : "This recycler account is not linked to a marketplace recycler profile yet. You can still sign in, but assigned requests will appear only after mapping is completed.",
+    },
     stats: buildRecyclerStats(requests),
     requests: requests.map((request) => ({
       ...request,

@@ -2,9 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
-const apiBaseUrl =
-  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:5000/api";
-
 const DEVICE_WEIGHT_KG = { Phone: 0.17, Laptop: 2.4, Tablet: 0.5, Headphones: 0.25 };
 const MATERIAL_YIELD = {
   Phone: { goldG: 0.03, copperKg: 0.015, lithiumKg: 0.005, plasticKg: 0.03 },
@@ -60,9 +57,12 @@ export default function RecyclerDashboard() {
     try {
       setLoading(true);
       setError("");
-      const res = await authFetch(`${apiBaseUrl}/recycler-ops/dashboard`);
-      if (!res.ok) throw new Error("Failed to load dashboard");
-      setData(await res.json());
+      const res = await authFetch("/recycler-ops/dashboard");
+      const result = await res.json();
+      if (!res.ok || !result.success) {
+        throw new Error(result.message || "Failed to load dashboard");
+      }
+      setData(result.data);
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
   }, [authFetch]);
@@ -71,6 +71,7 @@ export default function RecyclerDashboard() {
 
   const requests = data?.requests || [];
   const stats = data?.stats || {};
+  const onboarding = data?.onboarding || null;
 
   const pendingReqs = useMemo(() => requests.filter(r => r.recyclerStatus === "awaiting_device" && !rejectedIds.includes(r.pickupId)), [requests, rejectedIds]);
   const activePickups = useMemo(() => requests.filter(r => r.recyclerStatus === "verified"), [requests]);
@@ -120,7 +121,7 @@ export default function RecyclerDashboard() {
   async function updateStatus(pickupId, nextStatus) {
     setUpdatingId(pickupId);
     try {
-      const res = await authFetch(`${apiBaseUrl}/recycler-ops/requests/${pickupId}/status`, {
+      const res = await authFetch(`/recycler-ops/requests/${pickupId}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: nextStatus, finalVerifiedValue: form.finalVerifiedValue || undefined, processingMethod: form.processingMethod || undefined, recyclerNotes: form.recyclerNotes || undefined }),
@@ -186,6 +187,14 @@ export default function RecyclerDashboard() {
 
         {successMsg && <div className="mb-4 rounded-xl bg-green-50 border border-green-200 p-4 text-green-700 font-medium">{"\u2705"} {successMsg}</div>}
         {error && data && <div className="mb-4 rounded-xl bg-red-50 border border-red-200 p-4 text-red-700">{error}</div>}
+        {onboarding?.note && (
+          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-800">
+            <p className="font-semibold">Recycler profile mapping pending</p>
+            <p className="mt-1 text-sm">
+              {onboarding.note}
+            </p>
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="mb-6 overflow-x-auto">

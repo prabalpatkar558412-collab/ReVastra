@@ -1,6 +1,6 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const { admin, db } = require("../config/firebase");
+const { admin, auth, db } = require("../config/firebase");
 const { recyclers } = require("../data/recyclers");
 
 const usersCollection = db.collection("users");
@@ -21,9 +21,11 @@ function sanitizeUser(user) {
     name: user.name,
     email: user.email,
     role: user.role,
+    authProvider: user.authProvider || "password",
     organizationName: user.organizationName || "",
     serviceArea: user.serviceArea || "",
     managedRecyclerId: user.managedRecyclerId || "",
+    photoURL: user.photoURL || "",
     phone: user.phone || "",
     address: user.address || "",
     preferredPaymentMethod: user.preferredPaymentMethod || "UPI",
@@ -43,6 +45,37 @@ function sanitizeUser(user) {
   };
 }
 
+function normalizeValue(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase();
+}
+
+function findManagedRecyclerId({
+  managedRecyclerId = "",
+  organizationName = "",
+  email = "",
+}) {
+  const directId = normalizeValue(managedRecyclerId);
+
+  if (directId) {
+    return directId;
+  }
+
+  const normalizedOrg = normalizeValue(organizationName);
+  const normalizedEmail = normalizeValue(email);
+
+  const matchedRecycler = recyclers.find((recycler) => {
+    return (
+      normalizeValue(recycler.id) === normalizedOrg ||
+      normalizeValue(recycler.name) === normalizedOrg ||
+      normalizeValue(recycler.recyclerOpsEmail) === normalizedEmail
+    );
+  });
+
+  return matchedRecycler?.id || "";
+}
+
 async function findUserByEmail(email) {
   const snapshot = await usersCollection.where("email", "==", email).limit(1).get();
 
@@ -58,6 +91,7 @@ async function createUser({
   email,
   password,
   role = "user",
+  authProvider = "password",
   organizationName = "",
   serviceArea = "",
   managedRecyclerId = "",
@@ -78,7 +112,16 @@ async function createUser({
 
   const userRef = usersCollection.doc();
   const now = new Date().toISOString();
-  const passwordHash = await bcrypt.hash(password, 12);
+  const passwordHash =
+    authProvider === "password" ? await bcrypt.hash(password, 12) : null;
+  const resolvedManagedRecyclerId =
+    role === "recycler"
+      ? findManagedRecyclerId({
+          managedRecyclerId,
+          organizationName,
+          email: normalizedEmail,
+        })
+      : managedRecyclerId.trim();
 
   const user = {
     userId: userRef.id,
@@ -86,14 +129,16 @@ async function createUser({
     email: normalizedEmail,
     passwordHash,
     role,
+    authProvider,
     organizationName: organizationName.trim(),
     serviceArea: serviceArea.trim(),
-    managedRecyclerId: managedRecyclerId.trim(),
+    managedRecyclerId: resolvedManagedRecyclerId,
     phone: phone.trim(),
     address: address.trim(),
     preferredPaymentMethod: preferredPaymentMethod.trim() || "UPI",
     upiId: upiId.trim(),
     bankAccount: bankAccount.trim(),
+    photoURL: "",
     rewardPoints: 0,
     notificationPreferences: {
       sms: true,
@@ -117,6 +162,19 @@ async function createUser({
   return sanitizeUser(user);
 }
 
+function signAuthToken(user) {
+  return jwt.sign(
+    {
+      userId: user.userId,
+      email: user.email,
+      role: user.role,
+      name: user.name,
+    },
+    getJwtSecret(),
+    { expiresIn: "7d" }
+  );
+}
+
 async function loginUser({ email, password, expectedRole }) {
   const normalizedEmail = email.trim().toLowerCase();
   const user = await findUserByEmail(normalizedEmail);
@@ -127,7 +185,8 @@ async function loginUser({ email, password, expectedRole }) {
     throw error;
   }
 
-  const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+  const isPasswordValid =
+    Boolean(user.passwordHash) && (await bcrypt.compare(password, user.passwordHash));
 
   if (!isPasswordValid) {
     const error = new Error("Invalid email or password");
@@ -142,19 +201,106 @@ async function loginUser({ email, password, expectedRole }) {
   }
 
   const safeUser = sanitizeUser(user);
-  const token = jwt.sign(
-    {
-      userId: safeUser.userId,
-      email: safeUser.email,
-      role: safeUser.role,
-      name: safeUser.name,
-    },
-    getJwtSecret(),
-    { expiresIn: "7d" }
-  );
+  const token = signAuthToken(safeUser);
 
   return {
     token,
+    user: safeUser,
+  };
+}
+
+async function loginWithGoogleIdToken(idToken) {
+  if (!idToken) {
+    const error = new Error("Google identity token is required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  let decodedToken;
+
+  try {
+    decodedToken = await auth.verifyIdToken(idToken);
+  } catch {
+    const error = new Error("Unable to verify Google sign-in");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  const normalizedEmail = String(decodedToken.email || "")
+    .trim()
+    .toLowerCase();
+
+  if (!normalizedEmail) {
+    const error = new Error("Google account email is required");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  let user = await findUserByEmail(normalizedEmail);
+
+  if (user && user.role !== "user") {
+    const error = new Error(
+      "This Google account is already linked to a non-consumer role"
+    );
+    error.statusCode = 403;
+    throw error;
+  }
+
+  if (!user) {
+    const userRef = usersCollection.doc();
+    const now = new Date().toISOString();
+
+    user = {
+      userId: userRef.id,
+      name: String(decodedToken.name || normalizedEmail.split("@")[0]).trim(),
+      email: normalizedEmail,
+      passwordHash: null,
+      role: "user",
+      authProvider: "google",
+      organizationName: "",
+      serviceArea: "",
+      managedRecyclerId: "",
+      phone: "",
+      address: "",
+      preferredPaymentMethod: "UPI",
+      upiId: "",
+      bankAccount: "",
+      photoURL: String(decodedToken.picture || "").trim(),
+      rewardPoints: 0,
+      notificationPreferences: {
+        sms: true,
+        email: true,
+        app: true,
+      },
+      createdAt: now,
+      updatedAt: now,
+      totalEarnings: 0,
+      devicesRecycled: 0,
+      pickupCount: 0,
+      ewasteSavedKg: 0,
+    };
+
+    await userRef.set({
+      ...user,
+      createdAtServer: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAtServer: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  } else if (user.authProvider !== "google" || !user.photoURL) {
+    await usersCollection.doc(user.userId).update({
+      authProvider: "google",
+      photoURL: String(decodedToken.picture || user.photoURL || "").trim(),
+      updatedAt: new Date().toISOString(),
+      updatedAtServer: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    const refreshedUser = await usersCollection.doc(user.userId).get();
+    user = refreshedUser.data();
+  }
+
+  const safeUser = sanitizeUser(user);
+
+  return {
+    token: signAuthToken(safeUser),
     user: safeUser,
   };
 }
@@ -248,6 +394,7 @@ async function ensurePartnerUsers() {
     process.env.COLLECTOR_PASSWORD || "Collector@123";
 
   const collectorUser = await findUserByEmail(collectorEmail);
+  const collectorPasswordHash = await bcrypt.hash(collectorPassword, 12);
 
   if (!collectorUser) {
     await createUser({
@@ -258,10 +405,25 @@ async function ensurePartnerUsers() {
       organizationName: "Local Scrap Partner Network",
       serviceArea: "Central India",
     });
+  } else {
+    await usersCollection.doc(collectorUser.userId).update({
+      name: collectorName,
+      role: "collector",
+      organizationName: "Local Scrap Partner Network",
+      serviceArea: "Central India",
+      managedRecyclerId: "",
+      passwordHash: collectorPasswordHash,
+      updatedAt: new Date().toISOString(),
+      updatedAtServer: admin.firestore.FieldValue.serverTimestamp(),
+    });
   }
 
   for (const recycler of recyclers) {
     const existingRecyclerUser = await findUserByEmail(recycler.recyclerOpsEmail);
+    const recyclerPasswordHash = await bcrypt.hash(
+      process.env.RECYCLER_PASSWORD || "Recycler@123",
+      12
+    );
 
     if (!existingRecyclerUser) {
       await createUser({
@@ -273,6 +435,17 @@ async function ensurePartnerUsers() {
         serviceArea: recycler.location,
         managedRecyclerId: recycler.id,
       });
+    } else {
+      await usersCollection.doc(existingRecyclerUser.userId).update({
+        name: recycler.recyclerOpsName,
+        role: "recycler",
+        organizationName: recycler.name,
+        serviceArea: recycler.location,
+        managedRecyclerId: recycler.id,
+        passwordHash: recyclerPasswordHash,
+        updatedAt: new Date().toISOString(),
+        updatedAtServer: admin.firestore.FieldValue.serverTimestamp(),
+      });
     }
   }
 }
@@ -282,6 +455,7 @@ module.exports = {
   ensureAdminUser,
   ensurePartnerUsers,
   getUserById,
+  loginWithGoogleIdToken,
   loginUser,
   updateUserProfile,
 };

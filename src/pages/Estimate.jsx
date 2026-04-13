@@ -37,7 +37,9 @@ export default function Estimate() {
         const res = await fetch(`${apiBaseUrl}/recyclers/recommendations/${estimateData.submissionId}`);
         const result = await res.json();
         if (alive && result.success) setRecyclers(result.data?.recyclers || []);
-      } catch {} finally { if (alive) setRecLoading(false); }
+      } catch {
+        // Recycler recommendations are optional on this screen.
+      } finally { if (alive) setRecLoading(false); }
     })();
     return () => { alive = false; };
   }, [estimateData?.submissionId, estimateData?.estimatedValue]);

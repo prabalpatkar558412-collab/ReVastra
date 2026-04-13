@@ -1,6 +1,7 @@
 const {
   createUser,
   getUserById,
+  loginWithGoogleIdToken,
   loginUser,
   updateUserProfile,
 } = require("../services/auth.service");
@@ -19,6 +20,24 @@ function validateRegisterBody(body) {
   }
 }
 
+function validateRegisterRole(role) {
+  const normalizedRole = String(role || "user").trim().toLowerCase();
+
+  if (normalizedRole === "admin") {
+    const error = new Error("Admin accounts cannot be self-registered");
+    error.statusCode = 403;
+    throw error;
+  }
+
+  if (!["user", "collector", "recycler"].includes(normalizedRole)) {
+    const error = new Error("Invalid role selected for registration");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return normalizedRole;
+}
+
 function validateLoginBody(body) {
   if (!body.email || !body.password) {
     const error = new Error("Email and password are required");
@@ -30,17 +49,21 @@ function validateLoginBody(body) {
 async function registerController(req, res, next) {
   try {
     validateRegisterBody(req.body);
+    const requestedRole = validateRegisterRole(req.body.role);
 
     const user = await createUser({
       name: req.body.name,
       email: req.body.email,
       password: req.body.password,
-      role: "user",
+      role: requestedRole,
+      organizationName: req.body.organizationName || "",
+      serviceArea: req.body.serviceArea || "",
     });
 
     const loginResult = await loginUser({
       email: req.body.email,
       password: req.body.password,
+      expectedRole: requestedRole,
     });
 
     res.status(201).json({
@@ -50,6 +73,20 @@ async function registerController(req, res, next) {
         token: loginResult.token,
         user,
       },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function googleLoginController(req, res, next) {
+  try {
+    const result = await loginWithGoogleIdToken(req.body?.idToken);
+
+    res.status(200).json({
+      success: true,
+      message: "Google sign-in successful",
+      data: result,
     });
   } catch (error) {
     next(error);
@@ -110,6 +147,7 @@ async function updateMeController(req, res, next) {
 }
 
 module.exports = {
+  googleLoginController,
   loginController,
   meController,
   registerController,

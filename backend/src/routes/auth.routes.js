@@ -1,5 +1,6 @@
 const express = require("express");
 const {
+  googleLoginController,
   loginController,
   meController,
   registerController,
@@ -11,6 +12,7 @@ const router = express.Router();
 
 router.post("/register", registerController);
 router.post("/login", loginController);
+router.post("/google-login", googleLoginController);
 router.get("/me", authMiddleware, meController);
 router.patch("/me", authMiddleware, updateMeController);
 

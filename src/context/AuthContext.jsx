@@ -7,6 +7,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { signInWithGooglePopupClient } from "../lib/firebaseClient";
 
 const apiBaseUrl =
   import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:5000/api";
@@ -181,7 +182,14 @@ export function AuthProvider({ children }) {
   );
 
   const register = useCallback(
-    async ({ name, email, password }) => {
+    async ({
+      name,
+      email,
+      password,
+      role = "user",
+      organizationName = "",
+      serviceArea = "",
+    }) => {
       setIsLoading(true);
 
       try {
@@ -190,7 +198,14 @@ export function AuthProvider({ children }) {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ name, email, password }),
+          body: JSON.stringify({
+            name,
+            email,
+            password,
+            role,
+            organizationName,
+            serviceArea,
+          }),
         });
 
         const result = await response.json();
@@ -211,6 +226,36 @@ export function AuthProvider({ children }) {
     []
   );
 
+  const loginWithGoogle = useCallback(async () => {
+    setIsLoading(true);
+
+    try {
+      const googleResult = await signInWithGooglePopupClient();
+      const idToken = await googleResult.user.getIdToken();
+      const response = await fetch(`${apiBaseUrl}/auth/google-login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ idToken }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || "Google sign-in failed");
+      }
+
+      setToken(result.data.token);
+      setUser(result.data.user);
+      setIsBootstrapping(false);
+
+      return result.data.user;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   const logout = useCallback(() => {
     clearAuthState();
     setIsBootstrapping(false);
@@ -227,13 +272,25 @@ export function AuthProvider({ children }) {
       isBootstrapping,
       isLoading,
       login,
+      loginWithGoogle,
       logout,
       register,
       syncUser,
       token,
       user,
     }),
-    [authFetch, isBootstrapping, isLoading, login, logout, register, syncUser, token, user]
+    [
+      authFetch,
+      isBootstrapping,
+      isLoading,
+      login,
+      loginWithGoogle,
+      logout,
+      register,
+      syncUser,
+      token,
+      user,
+    ]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

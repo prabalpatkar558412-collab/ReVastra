@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:5000/api";
 const PER_PICKUP_EARNING = 150;
 
 function fmt$(v) { return `\u20B9${Number(v || 0).toLocaleString("en-IN")}`; }
@@ -25,6 +24,8 @@ const TABS = [
 
 export default function CollectorDashboard() {
   const { authFetch, user } = useAuth();
+  const googleMapsEmbedKey =
+    import.meta.env.VITE_GOOGLE_MAPS_EMBED_API_KEY || "";
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -46,9 +47,12 @@ export default function CollectorDashboard() {
     try {
       setLoading(true);
       setError("");
-      const res = await authFetch(`${apiBaseUrl}/collector/dashboard`);
-      if (!res.ok) throw new Error("Failed to load dashboard");
-      setData(await res.json());
+      const res = await authFetch("/collector/dashboard");
+      const result = await res.json();
+      if (!res.ok || !result.success) {
+        throw new Error(result.message || "Failed to load dashboard");
+      }
+      setData(result.data);
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
   }, [authFetch]);
@@ -63,7 +67,7 @@ export default function CollectorDashboard() {
   async function updateStatus(pickupId, nextStatus) {
     setUpdatingId(pickupId);
     try {
-      const res = await authFetch(`${apiBaseUrl}/collector/requests/${pickupId}/status`, {
+      const res = await authFetch(`/collector/requests/${pickupId}/status`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: nextStatus }),
       });
@@ -75,14 +79,38 @@ export default function CollectorDashboard() {
   }
 
   /* A. Today's Tasks */
-  const todayTasks = useMemo(() =>
-    requests.filter(r => r.collectorStatus !== "delivered_to_recycler" || isToday(r.updatedAt)),
-    [requests]
-  );
   const pendingToday = useMemo(() =>
     requests.filter(r => r.collectorStatus === "assigned"),
     [requests]
   );
+  const routeStops = useMemo(
+    () => pendingToday.map((request) => request.address).filter(Boolean),
+    [pendingToday]
+  );
+  const routeDestination = routeStops[routeStops.length - 1] || "";
+  const routeWaypoints = routeStops.slice(0, -1).join("|");
+  const routeMapEmbedUrl = useMemo(() => {
+    if (!routeStops.length) {
+      return `https://www.google.com/maps?q=${encodeURIComponent(profileForm.baseLocation)}&output=embed`;
+    }
+
+    if (!googleMapsEmbedKey) {
+      return `https://www.google.com/maps?q=${encodeURIComponent(routeDestination || profileForm.baseLocation)}&output=embed`;
+    }
+
+    const params = new URLSearchParams({
+      key: googleMapsEmbedKey,
+      origin: profileForm.baseLocation,
+      destination: routeDestination,
+      mode: "driving",
+    });
+
+    if (routeWaypoints) {
+      params.set("waypoints", routeWaypoints);
+    }
+
+    return `https://www.google.com/maps/embed/v1/directions?${params.toString()}`;
+  }, [googleMapsEmbedKey, profileForm.baseLocation, routeDestination, routeStops.length, routeWaypoints]);
 
   /* D. Earnings */
   const earnings = useMemo(() => {
@@ -323,12 +351,20 @@ export default function CollectorDashboard() {
                 )}
               </div>
 
+              {pendingToday.length > 0 && !googleMapsEmbedKey ? (
+                <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+                  Embedded live route needs a Google Maps Embed API key. Showing
+                  the current stop map instead, and the route button will still
+                  open full directions in Google Maps.
+                </div>
+              ) : null}
+
               {pendingToday.length > 0 ? (
                 <div className="rounded-xl overflow-hidden border" style={{ height: "350px" }}>
                   <iframe
                     title="route-map"
                     width="100%" height="100%" frameBorder="0" style={{ border: 0 }}
-                    src={`https://www.google.com/maps/embed/v1/directions?key=&origin=${encodeURIComponent(profileForm.baseLocation)}&destination=${encodeURIComponent(pendingToday[pendingToday.length - 1]?.address || "")}&waypoints=${pendingToday.slice(0, -1).map(r => encodeURIComponent(r.address || "")).join("|")}&mode=driving`}
+                    src={routeMapEmbedUrl}
                     allowFullScreen
                   />
                 </div>

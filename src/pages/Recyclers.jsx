@@ -93,7 +93,7 @@ export default function Recyclers() {
         {/* Recycler Cards */}
         {!isLoading && (
           <div className="grid md:grid-cols-2 gap-6">
-            {recyclers.map((r, i) => (
+            {recyclers.map((r) => (
               <div key={r.id} className={`relative bg-white/5 backdrop-blur-xl border rounded-3xl p-6 transition-all hover:-translate-y-1 hover:shadow-2xl ${r.isBestMatch ? "border-green-500/40 shadow-lg shadow-green-500/10" : "border-white/10"}`}>
                 {r.isBestMatch && (
                   <div className="absolute -top-3 left-6 bg-gradient-to-r from-green-500 to-emerald-500 text-white text-xs font-bold px-4 py-1 rounded-full shadow-lg shadow-green-500/30">

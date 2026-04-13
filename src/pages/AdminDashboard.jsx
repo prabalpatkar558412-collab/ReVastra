@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:5000/api";
 const MKT_DEFAULT = { goldPerG: 6450, copperPerKg: 785, lithiumPerKg: 6100, plasticPerKg: 42 };
 const DEV_WT = { Phone: 0.17, Laptop: 2.4, Tablet: 0.5, Headphones: 0.25 };
 const MAT_YIELD = {
@@ -62,9 +61,12 @@ export default function AdminDashboard() {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await authFetch(`${apiBaseUrl}/admin/requests`);
-      if (!res.ok) throw new Error("Failed to load admin dashboard");
-      setData(await res.json());
+      const res = await authFetch("/admin/requests");
+      const result = await res.json();
+      if (!res.ok || !result.success) {
+        throw new Error(result.message || "Failed to load admin dashboard");
+      }
+      setData(result.data);
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
   }, [authFetch]);
@@ -72,7 +74,6 @@ export default function AdminDashboard() {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const requests = data?.requests || [];
-  const submissions = data?.submissions || [];
   const users = data?.users || [];
   const stats = data?.stats || {};
 
@@ -135,7 +136,7 @@ export default function AdminDashboard() {
   async function updateStatus(pickupId, nextStatus) {
     setUpdatingId(pickupId);
     try {
-      const res = await authFetch(`${apiBaseUrl}/admin/requests/${pickupId}/status`, {
+      const res = await authFetch(`/admin/requests/${pickupId}/status`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: nextStatus }),
       });
